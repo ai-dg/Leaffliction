@@ -1,0 +1,52 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import List
+import hashlib
+import zipfile
+
+
+class PathManager:
+    """
+    Centralise toutes les règles 'métier' liées aux chemins :
+    - création de dossiers
+    - convention de suffixes (_Flip, _Rotate, etc.)
+    - itération sur images
+    """
+
+    IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp"}
+
+    def ft_ensure_dir(self, path: Path) -> Path:
+        """Crée le dossier si absent, puis renvoie le Path."""
+        raise NotImplementedError
+
+    def ft_make_suffixed_path(self, image_path: Path, suffix: str) -> Path:
+        """
+        Exemple:
+        input:  /a/b/image (1).JPG  + suffix="Flip"
+        output: /a/b/image (1)_Flip.JPG
+        """
+        raise NotImplementedError
+
+    def ft_iter_images(self, root: Path, recursive: bool = False) -> List[Path]:
+        """Liste les images dans root (option recursive)."""
+        raise NotImplementedError
+
+
+class Hasher:
+    """Outils de hash (SHA1) pour signature.txt."""
+
+    def ft_sha1_file(self, path: Path, chunk_size: int = 1024 * 1024) -> str:
+        """Retourne le SHA1 hex d'un fichier."""
+        raise NotImplementedError
+
+
+class ZipPackager:
+    """Compression ZIP (dossier -> zip)."""
+
+    def ft_zip_dir(self, src_dir: Path, out_zip: Path) -> None:
+        """
+        Zip tout le contenu de src_dir dans out_zip.
+        Attention: out_zip ne doit pas être dans src_dir sinon boucle.
+        """
+        raise NotImplementedError
