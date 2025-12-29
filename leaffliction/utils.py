@@ -8,10 +8,10 @@ import zipfile
 
 class PathManager:
     """
-    Centralise toutes les règles 'métier' liées aux chemins :
-    - création de dossiers
-    - convention de suffixes (_Flip, _Rotate, etc.)
-    - itération sur images
+    Centralizes all 'business logic' rules related to paths:
+    - directory creation
+    - suffix conventions (_Flip, _Rotate, etc.)
+    - image iteration
     """
 
     IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp"}
