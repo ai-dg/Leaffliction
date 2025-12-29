@@ -17,6 +17,7 @@ class KerasAugmentationsFactory:
         raise NotImplementedError
 
 
+
 class Augmentation(Protocol):
     """
     Interface d'une augmentation.
