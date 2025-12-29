@@ -33,11 +33,23 @@ class PathManager:
 
     def ft_make_suffixed_path(self, image_path: Path, suffix: str) -> Path:
         """
-        Exemple:
-        input:  /a/b/image (1).JPG  + suffix="Flip"
-        output: /a/b/image (1)_Flip.JPG
+        Add a suffix to a the filename of the path.
+
+        Parameters:
+            image_path (Path): File path to the image
+            suffix (str): The suffix to append to the path
+
+        Returns:
+            Path: The new path.
+
+        Example:
+            input:  /a/b/image1.JPG  + suffix="Flip"
+            output: /a/b/image1_Flip.JPG
         """
-        raise NotImplementedError
+        new_name = f"{image_path.stem}{str}{image_path.suffix}"
+        new_path = image_path.with_name(new_name)
+        image_path.rename(new_path)
+        return image_path
 
     def ft_iter_images(
             self,
