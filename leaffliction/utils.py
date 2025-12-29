@@ -74,10 +74,20 @@ class PathManager:
 
 
 class Hasher:
-    """Outils de hash (SHA1) pour signature.txt."""
+    """Hash tools (SHA1) for signature.txt."""
 
     def ft_sha1_file(self, path: Path, chunk_size: int = 1024 * 1024) -> str:
-        """Retourne le SHA1 hex d'un fichier."""
+        """
+        Returns the SHA1 hex of a path.
+        
+        Args:
+            path (Path): path to the file/directory to process
+            chunk_size (int): ??
+
+        Returns:
+            str: The SHA1 hex of the path
+        """
+
         raise NotImplementedError
 
 
