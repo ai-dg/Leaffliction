@@ -35,7 +35,7 @@ class PathManager:
         """
         Add a suffix to a the filename of the path.
 
-        Parameters:
+        Args:
             image_path (Path): File path to the image
             suffix (str): The suffix to append to the path
 
@@ -56,8 +56,21 @@ class PathManager:
             root: Path,
             recursive: bool = False
             ) -> List[Path]:
-        """Liste les images dans root (option recursive)."""
-        raise NotImplementedError
+        """
+        List images in the given directory (recursive option).
+
+        Args:
+            root (Path): the root directory of the listing
+            recursive (bool): recursive option
+
+        Returns:
+            List[Path]: The list of all images.
+        """
+        pattern = "**/*" if recursive else "*"
+        return [
+            file for file in root.glob(pattern)
+            if file.is_file() and file.suffix in self.IMAGE_EXTS
+        ]
 
 
 class Hasher:
