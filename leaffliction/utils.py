@@ -17,8 +17,19 @@ class PathManager:
     IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp"}
 
     def ft_ensure_dir(self, path: Path) -> Path:
-        """Crée le dossier si absent, puis renvoie le Path."""
-        raise NotImplementedError
+        """
+        Ensure the directory exists, creating it if needed,
+        the return the same Path.
+        Creates parent directories; no error if it already exist
+
+        Args:
+            path (Path): The path from which we should create a folder
+
+        Returns:
+            Path: The input path object
+        """
+        path.mkdir(parents=True, exist_ok=True)
+        return path
 
     def ft_make_suffixed_path(self, image_path: Path, suffix: str) -> Path:
         """
@@ -28,7 +39,11 @@ class PathManager:
         """
         raise NotImplementedError
 
-    def ft_iter_images(self, root: Path, recursive: bool = False) -> List[Path]:
+    def ft_iter_images(
+            self,
+            root: Path,
+            recursive: bool = False
+            ) -> List[Path]:
         """Liste les images dans root (option recursive)."""
         raise NotImplementedError
 
