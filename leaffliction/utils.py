@@ -76,19 +76,31 @@ class PathManager:
 class Hasher:
     """Hash tools (SHA1) for signature.txt."""
 
-    def ft_sha1_file(self, path: Path, chunk_size: int = 1024 * 1024) -> str:
+    def ft_sha1_file(
+            self,
+            path: Path,
+            chunk_size: int = 1024 * 1024
+            ) -> str:
         """
         Returns the SHA1 hex of a path.
-        
+
         Args:
             path (Path): path to the file/directory to process
-            chunk_size (int): ??
+            chunk_size (int): Size of chunks to read at once (bytes)
 
         Returns:
             str: The SHA1 hex of the path
         """
+        sha1_hash = hashlib.sha1()
 
-        raise NotImplementedError
+        with open(path, 'rb') as f:
+            while True:
+                chunk = f.read(chunk_size)
+                if not chunk:
+                    break
+                sha1_hash.update(chunk)
+
+        return sha1_hash.hexdigest()
 
 
 class ZipPackager:
