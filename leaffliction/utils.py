@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List
 import hashlib
-import zipfile
+import shutil
 
 
 class PathManager:
@@ -104,11 +104,25 @@ class Hasher:
 
 
 class ZipPackager:
-    """Compression ZIP (dossier -> zip)."""
+    """ZIP Compression ZIP (directory -> zip)."""
 
     def zip_dir(self, src_dir: Path, out_zip: Path) -> None:
         """
-        Zip tout le contenu de src_dir dans out_zip.
-        Attention: out_zip ne doit pas être dans src_dir sinon boucle.
+        Zip all the content of src_dir into out_zip.
+
+        Args:
+            src_dir (Path): the directory to be zipped
+            out_zip (Path): the destination path of the zip
+
+        Raises:
+            ValueError: If the destination path is inside the source path
         """
-        raise NotImplementedError
+        if src_dir.resolve() in out_zip.resolve().parents:
+            raise ValueError(
+                "Destination path can't be inside the source path."
+                )
+        shutil.make_archive(
+            base_name=str(out_zip.with_suffix('')),
+            format='zip',
+            root_dir=src_dir
+        )
