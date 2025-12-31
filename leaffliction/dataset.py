@@ -39,7 +39,7 @@ class DatasetScanner:
         img2.jpg
     """
 
-    def ft_scan(self, root: Path) -> DatasetIndex:
+    def scan(self, root: Path) -> DatasetIndex:
         """Construit un DatasetIndex depuis un dossier racine."""
         raise NotImplementedError
 
@@ -49,7 +49,7 @@ class DatasetSplitter:
     Split train/valid à partir de la liste items.
     """
 
-    def ft_split(
+    def split(
         self,
         items: List[Tuple[Path, int]],
         valid_ratio: float,

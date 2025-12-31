@@ -14,7 +14,7 @@ def main() -> None:
     dataset_dir = Path(args.dataset_dir)
 
     scanner = DatasetScanner()
-    index = scanner.ft_scan(dataset_dir)
+    index = scanner.scan(dataset_dir)
 
     title = f"Dataset distribution: {index.root.name}"
 
