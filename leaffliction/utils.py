@@ -46,9 +46,9 @@ class PathManager:
             input:  /a/b/image1.JPG  + suffix="Flip"
             output: /a/b/image1_Flip.JPG
         """
-        new_name = f"{image_path.stem}{str}{image_path.suffix}"
+        new_name = f"{image_path.stem}{suffix}{image_path.suffix}"
         new_path = image_path.with_name(new_name)
-        image_path.rename(new_path)
+        image_path = image_path.rename(new_path)
         return image_path
 
     def iter_images(
@@ -69,7 +69,7 @@ class PathManager:
         pattern = "**/*" if recursive else "*"
         return [
             file for file in root.glob(pattern)
-            if file.is_file() and file.suffix in self.IMAGE_EXTS
+            if file.is_file() and file.suffix.lower() in self.IMAGE_EXTS
         ]
 
 
