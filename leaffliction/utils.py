@@ -16,7 +16,7 @@ class PathManager:
 
     IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp"}
 
-    def ft_ensure_dir(self, path: Path) -> Path:
+    def ensure_dir(self, path: Path) -> Path:
         """
         Ensure the directory exists, creating it if needed,
         the return the same Path.
@@ -31,7 +31,7 @@ class PathManager:
         path.mkdir(parents=True, exist_ok=True)
         return path
 
-    def ft_make_suffixed_path(self, image_path: Path, suffix: str) -> Path:
+    def make_suffixed_path(self, image_path: Path, suffix: str) -> Path:
         """
         Add a suffix to a the filename of the path.
 
@@ -51,7 +51,7 @@ class PathManager:
         image_path.rename(new_path)
         return image_path
 
-    def ft_iter_images(
+    def iter_images(
             self,
             root: Path,
             recursive: bool = False
@@ -76,7 +76,7 @@ class PathManager:
 class Hasher:
     """Hash tools (SHA1) for signature.txt."""
 
-    def ft_sha1_file(
+    def sha1_file(
             self,
             path: Path,
             chunk_size: int = 1024 * 1024
@@ -106,7 +106,7 @@ class Hasher:
 class ZipPackager:
     """Compression ZIP (dossier -> zip)."""
 
-    def ft_zip_dir(self, src_dir: Path, out_zip: Path) -> None:
+    def zip_dir(self, src_dir: Path, out_zip: Path) -> None:
         """
         Zip tout le contenu de src_dir dans out_zip.
         Attention: out_zip ne doit pas être dans src_dir sinon boucle.
