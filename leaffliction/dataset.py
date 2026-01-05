@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Any
 import tensorflow as tf
+from utils import PathManager
 
 
 @dataclass
@@ -41,7 +42,25 @@ class DatasetScanner:
 
     def scan(self, root: Path) -> DatasetIndex:
         """Construit un DatasetIndex depuis un dossier racine."""
-        raise NotImplementedError
+        root = root.resolve()
+        pm = PathManager()
+        
+        lst_img = pm.iter_images(root, recursive=True)
+
+        class_names = []
+        items = []
+        counts = {}
+        for img in lst_img:
+            name = img.parent.name
+            if name not in class_names:
+                class_names.append(name)
+            items.append((img, class_names.index(name)))
+            if name not in counts:
+                counts[name] = 1
+            else:
+                counts[name] = counts[name] + 1
+
+        return DatasetIndex(root, class_names, items, counts)
 
 
 class DatasetSplitter:
@@ -94,3 +113,14 @@ class TFDatasetBuilder:
         label: tf.int32
         """
         raise NotImplementedError
+
+# TODO - To Remove after finishing implementation
+
+def main() -> None: 
+    scanner = DatasetScanner()
+    dataset = scanner.scan(Path("leaves"))
+    print(dataset.class_names)
+    print(dataset.counts)
+
+if __name__ == "__main__":
+    main()
