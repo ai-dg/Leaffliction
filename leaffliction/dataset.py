@@ -80,55 +80,34 @@ class DatasetSplitter:
         Retourne (train_items, valid_items)
         - stratified: conserve approx les proportions de classes
         """
-
-        cnt = Counter()
-        for item in items:
-            cnt[item[1]] += 1
-
+        import random
+        random.seed(seed)
         
-
-
-
-
-@dataclass
-class TFDataConfig:
-    img_size: Tuple[int, int] = (224, 224)
-    batch_size: int = 32
-    shuffle: bool = True
-    seed: int = 42
-    cache: bool = False
-    prefetch: bool = True
-
-
-class TFDatasetBuilder:
-    """
-    Transforme une liste [(Path, label_id), ...] en tf.data.Dataset.
-    augmentor: typiquement un keras.Model / keras.Sequential d'augmentations.
-    """
-
-    def __init__(self, cfg: TFDataConfig, augmentor: Optional[Any] = None) -> None:
-        self.cfg = cfg
-        self.augmentor = augmentor
-
-    def build(
-        self,
-        items: List[Tuple[Path, int]],
-        training: bool
-    ) -> tf.data.Dataset:
-        """
-        Retourne un tf.data.Dataset qui yield (image_tensor, label_id)
-        image_tensor: tf.float32, shape (H,W,3)
-        label: tf.int32
-        """
-        raise NotImplementedError
-
-# TODO - To Remove after finishing implementation
-
-def main() -> None: 
-    scanner = DatasetScanner()
-    dataset = scanner.scan(Path("leaves"))
-    print(dataset.class_names)
-    print(dataset.counts)
-
-if __name__ == "__main__":
-    main()
+        if not stratified:
+            # Simple shuffle et split
+            items_copy = items.copy()
+            random.shuffle(items_copy)
+            split_idx = int(len(items_copy) * (1 - valid_ratio))
+            return items_copy[:split_idx], items_copy[split_idx:]
+        
+        # Stratifié: grouper par classe
+        class_items = {}
+        for path, label in items:
+            if label not in class_items:
+                class_items[label] = []
+            class_items[label].append((path, label))
+        
+        train_items = []
+        valid_items = []
+        
+        for label, items_list in class_items.items():
+            items_copy = items_list.copy()
+            random.shuffle(items_copy)
+            n_valid = int(len(items_copy) * valid_ratio)
+            valid_items.extend(items_copy[:n_valid])
+            train_items.extend(items_copy[n_valid:])
+        
+        random.shuffle(train_items)
+        random.shuffle(valid_items)
+        
+        return train_items, valid_items

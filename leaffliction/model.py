@@ -3,25 +3,26 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-import tensorflow as tf
-import keras
+import numpy as np
 
 
 @dataclass
 class ModelConfig:
-    img_size: Tuple[int, int] = (224, 224)
+    """Configuration du modèle ML"""
     num_classes: int = 0
     seed: int = 42
-    framework: str = "tf"  # tu restes sur "tf"
+    model_type: str = "svm"  # "svm", "random_forest", "knn"
     extra: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class ModelPaths:
-    model_file: str = "model.keras"
+    """Chemins des fichiers du bundle"""
+    model_file: str = "model.pkl"
+    scaler_file: str = "scaler.pkl"
     labels_file: str = "labels.json"
     config_file: str = "config.json"
-    preprocess_file: str = "preprocess.json"
+    feature_config_file: str = "feature_config.json"
 
 
 class LabelEncoder:
@@ -36,71 +37,109 @@ class LabelEncoder:
         self.id_to_class: Dict[int, str] = {}
 
     def fit(self, class_names: List[str]) -> None:
+        """Crée le mapping depuis une liste de noms de classes"""
         raise NotImplementedError
 
     def encode(self, class_name: str) -> int:
+        """Convertit un nom de classe en ID"""
         raise NotImplementedError
 
     def decode(self, class_id: int) -> str:
+        """Convertit un ID en nom de classe"""
         raise NotImplementedError
 
     def to_json_dict(self) -> Dict[str, Any]:
+        """Sérialise en dict pour JSON"""
         raise NotImplementedError
 
     @classmethod
     def from_json_dict(cls, data: Dict[str, Any]) -> "LabelEncoder":
+        """Désérialise depuis un dict JSON"""
         raise NotImplementedError
 
 
-class ModelFactory:
+class MLModelFactory:
     """
-    Construit un modèle (TensorFlow/Keras).
+    Construit un modèle ML traditionnel (sklearn).
+    Supporte: SVM, Random Forest, KNN
     """
 
-    def build(self, cfg: ModelConfig) -> keras.Model:
+    def build(self, cfg: ModelConfig) -> Any:
+        """
+        Construit un modèle sklearn selon cfg.model_type
+        
+        model_type:
+        - "svm": SVC avec kernel RBF
+        - "random_forest": RandomForestClassifier
+        - "knn": KNeighborsClassifier
+        
+        Retourne: modèle sklearn non entraîné
+        """
         raise NotImplementedError
 
 
-class ModelBundle:
+class MLModelBundle:
     """
-    Ce qui est sauvegardé pour predict:
-    - modèle (model.keras)
-    - label encoder (labels.json)
-    - config (config.json)
-    - preprocess (preprocess.json)
+    Bundle complet pour sauvegarder/charger un modèle ML.
+    
+    Contient:
+    - model: modèle sklearn entraîné
+    - scaler: StandardScaler pour normaliser les features
+    - labels: LabelEncoder pour les classes
+    - feature_extractor: FeatureExtractor pour extraire features
+    - cfg: ModelConfig
     """
 
     def __init__(
         self,
-        model: keras.Model,
+        model: Any,  # sklearn model
+        scaler: Any,  # StandardScaler
         labels: LabelEncoder,
+        feature_extractor: Any,  # FeatureExtractor
         cfg: ModelConfig,
-        preprocess: Optional[Dict[str, Any]] = None,
         paths: Optional[ModelPaths] = None
     ) -> None:
         self.model = model
+        self.scaler = scaler
         self.labels = labels
+        self.feature_extractor = feature_extractor
         self.cfg = cfg
-        self.preprocess = preprocess or {}
         self.paths = paths or ModelPaths()
 
     def save(self, out_dir: Path) -> None:
         """
-        out_dir/
-          model.keras
-          labels.json
-          config.json
-          preprocess.json
+        Sauvegarde le bundle dans out_dir/:
+        - model.pkl (sklearn model avec joblib)
+        - scaler.pkl (StandardScaler avec joblib)
+        - labels.json
+        - config.json
+        - feature_config.json
         """
         raise NotImplementedError
 
     @classmethod
-    def load(cls, in_dir: Path) -> "ModelBundle":
+    def load(cls, in_dir: Path) -> "MLModelBundle":
         """
-        model = keras.models.load_model(...)
+        Charge le bundle depuis in_dir/
         """
         raise NotImplementedError
 
     @classmethod
-    def load_from_zip(cls, zip_path: Path, extract_dir: Path) -> "ModelBundle":
+    def load_from_zip(cls, zip_path: Path, extract_dir: Optional[Path] = None) -> "MLModelBundle":
+        """
+        Extrait le zip puis charge le bundle.
+        """
+        raise NotImplementedError
+    
+    def predict(self, features: np.ndarray) -> Tuple[int, Dict[str, float]]:
+        """
+        Prédit la classe depuis un vecteur de features.
+        
+        Args:
+            features: np.ndarray de shape (n_features,) ou (1, n_features)
+        
+        Retourne:
+            - pred_id: int (ID de la classe prédite)
+            - probs: Dict[str, float] (probabilités par classe)
+        """
         raise NotImplementedError
