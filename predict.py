@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 import cv2
+import torch
 
 from leaffliction.cli import CLIBuilder
-from leaffliction.predict_pipeline import MLPredictor, PredictConfig, PredictionVisualiser
+from leaffliction.predict_pipeline import PyTorchPredictor, PredictConfig
 from leaffliction.transformations import TransformationEngine
-from leaffliction.model import MLModelBundle
+from leaffliction.model import PyTorchModelBundle
 
 
 def main() -> None:
@@ -18,55 +19,59 @@ def main() -> None:
 
     cfg = PredictConfig(
         show_transforms=getattr(args, "show_transforms", True),
-        top_k=getattr(args, "top_k", 3),  # Top 3 prédictions par défaut
+        top_k=getattr(args, "top_k", 3),
     )
 
-    # Moteur de transformations
-    engine = TransformationEngine.default_six()
+    # Transformation engine
+    tf_engine = TransformationEngine.default_six()
 
-    # Predictor ML
-    predictor = MLPredictor(bundle_loader=MLModelBundle, transformations_engine=engine)
+    # Predictor PyTorch
+    predictor = PyTorchPredictor(
+        bundle_loader=PyTorchModelBundle,
+        transformation_engine=tf_engine
+    )
 
-    print(f"🔍 Predicting disease for: {image_path.name}")
-    print(f"📦 Using model from: {bundle_zip}")
+    print("=" * 60)
+    print("🍃 LEAFFLICTION - PyTorch Prediction")
+    print("=" * 60)
+    print(f"   Model: {bundle_zip}")
+    print(f"   Image: {image_path}")
+    print("=" * 60)
     print()
 
     # Prédiction
-    label, probs, transformed = predictor.predict(
-        bundle_zip=bundle_zip, 
-        image_path=image_path, 
+    predicted_label, probs, transformed = predictor.predict(
+        bundle_zip=bundle_zip,
+        image_path=image_path,
         cfg=cfg
     )
 
-    # Affichage résultat principal
+    # Affichage résultat
+    print("🎯 Prediction Result")
     print("=" * 60)
-    print("✅ PREDICTION RESULT")
-    print("=" * 60)
-    print(f"🍃 Predicted class: {label}")
-    print(f"📊 Confidence: {probs[label]:.1%}")
+    print(f"   Predicted class: {predicted_label}")
     print()
     
     # Top K prédictions
-    if cfg.top_k > 1:
-        print(f"Top {cfg.top_k} predictions:")
-        sorted_probs = sorted(probs.items(), key=lambda x: x[1], reverse=True)
-        for i, (class_name, prob) in enumerate(sorted_probs[:cfg.top_k], 1):
-            print(f"   {i}. {class_name}: {prob:.1%}")
-        print()
+    print(f"   Top {cfg.top_k} predictions:")
+    sorted_probs = sorted(probs.items(), key=lambda x: x[1], reverse=True)
+    for i, (label, prob) in enumerate(sorted_probs[:cfg.top_k], 1):
+        bar = "█" * int(prob * 30)
+        print(f"   {i}. {label:30s} {prob:6.2%} {bar}")
+    print("=" * 60)
+    print()
 
-    # Affichage visuel des transformations (optionnel)
+    # Affichage transformations (optionnel)
     if cfg.show_transforms and transformed:
         print("📊 Showing transformations...")
+        from leaffliction.plotting import GridPlotter
         
-        # Charger l'image originale pour affichage
+        # Charger image originale
         img = cv2.imread(str(image_path))
-        if img is not None:
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            
-            vis = PredictionVisualiser()
-            vis.show(original=img, transformed=transformed, predicted_label=label)
-    
-    print("=" * 60)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        
+        grid = GridPlotter()
+        grid.show_grid(f"Transformations - Predicted: {predicted_label}", transformed, original=img)
 
 
 if __name__ == "__main__":

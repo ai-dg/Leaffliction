@@ -4,12 +4,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Protocol, Tuple
 import numpy as np
+import cv2
+import torch
 
 
 class Transformation(Protocol):
     """
     Interface d'une transformation.
-    Utilisé pour extraire des features des images.
+    Utilisé pour créer des canaux de features pour PyTorch.
     """
     
     @property
@@ -78,7 +80,7 @@ class TransformationEngine:
     Moteur de transformations.
     Utilisé pour:
     1. Visualisation (Transformation.py) - apply_all()
-    2. Extraction de features (train/predict) - via FeatureExtractor
+    2. Création de tensors PyTorch (train/predict) - apply_all_as_tensor()
     """
     
     def __init__(self, tfs: List[Transformation]) -> None:
@@ -92,49 +94,76 @@ class TransformationEngine:
     def apply_all(self, img: np.ndarray) -> Dict[str, np.ndarray]:
         """Applique toutes les transformations pour visualisation"""
         raise NotImplementedError
-
-
-class FeatureExtractor:
-    """
-    Extrait des features numériques depuis une image.
-    Ces features seront utilisées par le modèle ML (SVM, Random Forest, etc.)
     
-    Features extraites:
-    - Histogrammes couleur
-    - Statistiques des transformations
-    - Textures (optionnel)
-    - Contours (optionnel)
-    """
-    
-    def __init__(self, transformations: List[Transformation]) -> None:
-        self.transformations = transformations
-    
-    def extract_features(self, img_path: Path) -> np.ndarray:
+    def apply_all_as_tensor(self, img: np.ndarray) -> torch.Tensor:
         """
-        Extrait un vecteur de features depuis une image.
+        Applique toutes les transformations et retourne un tensor PyTorch.
         
-        Retourne: np.ndarray de shape (n_features,)
+        Args:
+            img: Image RGB (H, W, 3)
         
-        Exemple de features:
-        - Histogramme couleur (256 bins × 3 channels = 768 features)
-        - Histogramme grayscale (256 features)
-        - Statistiques (mean, std, min, max par transformation)
-        - Total: ~1000-2000 features
+        Returns:
+            tensor: (n_transforms, H, W) avec les transformations comme canaux
         """
-        raise NotImplementedError
+        channels = []
+        
+        for tf in self.tfs:
+            # Appliquer transformation
+            transformed = tf.apply(img)
+            
+            # Convertir en grayscale si nécessaire
+            if len(transformed.shape) == 3:
+                transformed = cv2.cvtColor(transformed, cv2.COLOR_RGB2GRAY)
+            
+            # Normaliser [0, 255] → [0, 1]
+            transformed = transformed.astype(np.float32) / 255.0
+            
+            channels.append(transformed)
+        
+        # Stack en tensor (n_transforms, H, W)
+        tensor = torch.from_numpy(np.stack(channels, axis=0))
+        return tensor
     
-    def extract_batch(
-        self,
-        items: List[Tuple[Path, int]]
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    def batch_transform(
+        self, 
+        items: List[Tuple[Path, int]], 
+        img_size: Tuple[int, int] = (224, 224)
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Extrait features pour un batch d'images.
+        Transforme un batch d'images en tensors PyTorch.
         
-        Retourne:
-        - X: np.ndarray de shape (n_samples, n_features)
-        - y: np.ndarray de shape (n_samples,)
+        Args:
+            items: [(path, label), ...]
+            img_size: (H, W) taille de redimensionnement
+        
+        Returns:
+            X: (n, n_transforms, H, W) tensor des transformations
+            y: (n,) tensor des labels
         """
-        raise NotImplementedError
+        X_list = []
+        y_list = []
+        
+        for img_path, label in items:
+            # Charger image
+            img = cv2.imread(str(img_path))
+            if img is None:
+                print(f"⚠️  Warning: Could not load {img_path}")
+                continue
+            
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img = cv2.resize(img, img_size)
+            
+            # Transformer en tensor
+            tensor = self.apply_all_as_tensor(img)
+            
+            X_list.append(tensor)
+            y_list.append(label)
+        
+        # Stack en batch
+        X = torch.stack(X_list)  # (n, n_transforms, H, W)
+        y = torch.tensor(y_list, dtype=torch.long)  # (n,)
+        
+        return X, y
 
 
 class BatchTransformer:

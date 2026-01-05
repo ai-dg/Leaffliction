@@ -2,19 +2,23 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List
-import numpy as np
+from typing import Any, Dict, List, Tuple
+import torch
+import torch.nn as nn
+from torch.utils.data import TensorDataset, DataLoader
 
 
 @dataclass
 class TrainConfig:
-    # Paramètres ML traditionnels (pas d'epochs/batch_size comme CNN)
-    model_type: str = "svm"  # svm, random_forest, knn
+    # Paramètres PyTorch
+    epochs: int = 50
+    batch_size: int = 32
+    lr: float = 1e-3
     valid_ratio: float = 0.2
     seed: int = 42
+    img_size: Tuple[int, int] = (224, 224)
     augment_train: bool = True
     augmentations_per_image: int = 3
-    export_augmented_images: bool = False
     extra: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -26,9 +30,9 @@ class Metrics:
     notes: Dict[str, Any] = field(default_factory=dict)
 
 
-class MLTrainer:
+class PyTorchTrainer:
     """
-    Orchestrateur d'entraînement ML traditionnel.
+    Orchestrateur d'entraînement PyTorch.
     """
 
     def __init__(
@@ -36,34 +40,32 @@ class MLTrainer:
         dataset_scanner: Any, 
         dataset_splitter: Any, 
         augmentation_engine: Any,
-        feature_extractor: Any,
+        transformation_engine: Any,
         model_factory: Any, 
         labels: Any
     ) -> None:
         self.dataset_scanner = dataset_scanner
         self.dataset_splitter = dataset_splitter
         self.augmentation_engine = augmentation_engine
-        self.feature_extractor = feature_extractor
+        self.transformation_engine = transformation_engine
         self.model_factory = model_factory
         self.labels = labels
 
     def train(self, dataset_dir: Path, out_dir: Path, cfg: TrainConfig) -> Metrics:
         """
-        Pipeline complet ML traditionnel:
+        Pipeline complet PyTorch:
         1. Scanner le dataset
         2. Split train/valid (stratifié)
         3. (Optionnel) Augmenter le train set (images physiques)
-        4. Extraire features (train + valid)
-        5. Normaliser features (StandardScaler)
-        6. Construire le modèle ML (SVM/RF/KNN)
-        7. Entraîner
+        4. Transformer en tensors PyTorch (train + valid)
+        5. Créer DataLoaders
+        6. Construire le modèle PyTorch
+        7. Entraîner avec backpropagation
         8. Évaluer accuracy
-        9. Sauvegarder bundle (model.pkl, scaler.pkl, labels.json)
+        9. Sauvegarder bundle (model.pth, labels.json)
         
         Retourne: Metrics avec train_accuracy, valid_accuracy, valid_count
         """
-        from sklearn.preprocessing import StandardScaler
-        
         # 1. Scanner dataset
         print("📂 Scanning dataset...")
         index = self.dataset_scanner.scan(dataset_dir)
@@ -97,49 +99,142 @@ class MLTrainer:
             print(f"   Created {len(train_items)} total images (original + augmented)")
             print()
         
-        # 5. Extraire features
-        print("🔍 Extracting features...")
-        print("   Train features...")
-        X_train, y_train = self.feature_extractor.extract_batch(train_items)
-        print(f"   Train features: {X_train.shape}")
+        # 5. Transformer en tensors PyTorch
+        print("🔍 Transforming images to tensors...")
+        print("   Train tensors...")
+        X_train, y_train = self.transformation_engine.batch_transform(train_items, cfg.img_size)
+        print(f"   Train tensors: {X_train.shape}")
         
-        print("   Valid features...")
-        X_valid, y_valid = self.feature_extractor.extract_batch(valid_items)
-        print(f"   Valid features: {X_valid.shape}")
+        print("   Valid tensors...")
+        X_valid, y_valid = self.transformation_engine.batch_transform(valid_items, cfg.img_size)
+        print(f"   Valid tensors: {X_valid.shape}")
         print()
         
-        # 6. Normaliser features
-        print("📊 Normalizing features...")
-        scaler = StandardScaler()
-        X_train_scaled = scaler.fit_transform(X_train)
-        X_valid_scaled = scaler.transform(X_valid)
-        print("   StandardScaler fitted")
+        # 6. Créer DataLoaders
+        print("📦 Creating DataLoaders...")
+        train_dataset = TensorDataset(X_train, y_train)
+        valid_dataset = TensorDataset(X_valid, y_valid)
+        
+        train_loader = DataLoader(
+            train_dataset, 
+            batch_size=cfg.batch_size, 
+            shuffle=True
+        )
+        valid_loader = DataLoader(
+            valid_dataset, 
+            batch_size=cfg.batch_size, 
+            shuffle=False
+        )
+        print(f"   Train batches: {len(train_loader)}")
+        print(f"   Valid batches: {len(valid_loader)}")
         print()
         
         # 7. Construire modèle
-        print(f"🤖 Building {cfg.model_type.upper()} model...")
+        print("🤖 Building PyTorch model...")
         from leaffliction.model import ModelConfig
         model_cfg = ModelConfig(
             num_classes=index.num_classes,
+            input_channels=X_train.shape[1],  # Nombre de transformations
+            img_size=cfg.img_size,
             seed=cfg.seed
         )
-        model = self.model_factory.build(model_cfg, cfg.model_type)
+        model = self.model_factory.build(model_cfg)
+        
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        model.to(device)
         print(f"   Model: {type(model).__name__}")
+        print(f"   Device: {device}")
+        print(f"   Parameters: {sum(p.numel() for p in model.parameters()):,}")
         print()
         
         # 8. Entraîner
         print("🚀 Training model...")
         import time
         start_time = time.time()
-        model.fit(X_train_scaled, y_train)
+        
+        criterion = nn.CrossEntropyLoss()
+        optimizer = torch.optim.Adam(model.parameters(), lr=cfg.lr)
+        
+        best_valid_acc = 0.0
+        
+        for epoch in range(cfg.epochs):
+            # Training
+            model.train()
+            train_loss = 0.0
+            train_correct = 0
+            train_total = 0
+            
+            for X_batch, y_batch in train_loader:
+                X_batch, y_batch = X_batch.to(device), y_batch.to(device)
+                
+                optimizer.zero_grad()
+                outputs = model(X_batch)
+                loss = criterion(outputs, y_batch)
+                loss.backward()
+                optimizer.step()
+                
+                train_loss += loss.item()
+                _, predicted = torch.max(outputs, 1)
+                train_correct += (predicted == y_batch).sum().item()
+                train_total += y_batch.size(0)
+            
+            train_acc = train_correct / train_total
+            
+            # Validation
+            model.eval()
+            valid_correct = 0
+            valid_total = 0
+            
+            with torch.no_grad():
+                for X_batch, y_batch in valid_loader:
+                    X_batch, y_batch = X_batch.to(device), y_batch.to(device)
+                    outputs = model(X_batch)
+                    _, predicted = torch.max(outputs, 1)
+                    valid_correct += (predicted == y_batch).sum().item()
+                    valid_total += y_batch.size(0)
+            
+            valid_acc = valid_correct / valid_total
+            
+            # Sauvegarder meilleur modèle
+            if valid_acc > best_valid_acc:
+                best_valid_acc = valid_acc
+                torch.save(model.state_dict(), out_dir / "best_model.pth")
+            
+            # Affichage
+            if (epoch + 1) % 5 == 0 or epoch == 0:
+                print(f"   Epoch {epoch+1}/{cfg.epochs} - "
+                      f"Train Acc: {train_acc:.2%} - "
+                      f"Valid Acc: {valid_acc:.2%}")
+        
         training_time = time.time() - start_time
         print(f"   Training completed in {training_time:.1f}s")
         print()
         
-        # 9. Évaluer
-        print("📈 Evaluating...")
-        train_acc = model.score(X_train_scaled, y_train)
-        valid_acc = model.score(X_valid_scaled, y_valid)
+        # Charger meilleur modèle
+        model.load_state_dict(torch.load(out_dir / "best_model.pth"))
+        
+        # 9. Évaluation finale
+        print("📈 Final evaluation...")
+        model.eval()
+        train_correct = 0
+        valid_correct = 0
+        
+        with torch.no_grad():
+            for X_batch, y_batch in train_loader:
+                X_batch, y_batch = X_batch.to(device), y_batch.to(device)
+                outputs = model(X_batch)
+                _, predicted = torch.max(outputs, 1)
+                train_correct += (predicted == y_batch).sum().item()
+            
+            for X_batch, y_batch in valid_loader:
+                X_batch, y_batch = X_batch.to(device), y_batch.to(device)
+                outputs = model(X_batch)
+                _, predicted = torch.max(outputs, 1)
+                valid_correct += (predicted == y_batch).sum().item()
+        
+        train_acc = train_correct / len(train_dataset)
+        valid_acc = valid_correct / len(valid_dataset)
+        
         print(f"   Train accuracy: {train_acc:.2%}")
         print(f"   Valid accuracy: {valid_acc:.2%}")
         print()
@@ -150,20 +245,20 @@ class MLTrainer:
             valid_accuracy=valid_acc,
             valid_count=len(valid_items),
             notes={
-                "model_type": cfg.model_type,
                 "training_time": training_time,
-                "n_features": X_train.shape[1]
+                "epochs": cfg.epochs,
+                "best_epoch": epoch + 1,
+                "n_transforms": X_train.shape[1]
             }
         )
         
         # 11. Sauvegarder bundle
         print("💾 Saving model...")
-        from leaffliction.model import MLModelBundle
-        bundle = MLModelBundle(
+        from leaffliction.model import PyTorchModelBundle
+        bundle = PyTorchModelBundle(
             model=model,
-            scaler=scaler,
             labels=self.labels,
-            feature_extractor=self.feature_extractor,
+            transformation_engine=self.transformation_engine,
             cfg=model_cfg
         )
         bundle.save(out_dir / "model")
@@ -184,7 +279,7 @@ class TrainingPackager:
     def prepare_artifacts_dir(self, tmp_dir: Path) -> Path:
         """
         Prépare le dossier d'artefacts à zipper.
-        Pour ML traditionnel: model/, (optionnel) augmented/
+        Pour PyTorch: model/
         """
         artifacts_dir = tmp_dir / "artifacts"
         artifacts_dir.mkdir(parents=True, exist_ok=True)

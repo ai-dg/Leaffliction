@@ -5,9 +5,9 @@ from pathlib import Path
 from leaffliction.cli import CLIBuilder
 from leaffliction.dataset import DatasetScanner, DatasetSplitter
 from leaffliction.augmentations import AugmentationEngine
-from leaffliction.transformations import TransformationEngine, FeatureExtractor
-from leaffliction.model import MLModelFactory, LabelEncoder
-from leaffliction.train_pipeline import MLTrainer, TrainConfig, RequirementsGate, TrainingPackager
+from leaffliction.transformations import TransformationEngine
+from leaffliction.model import PyTorchModelFactory, LabelEncoder
+from leaffliction.train_pipeline import PyTorchTrainer, TrainConfig, RequirementsGate, TrainingPackager
 from leaffliction.utils import ZipPackager, Hasher
 
 
@@ -19,76 +19,77 @@ def main() -> None:
     out_dir = Path(getattr(args, "out_dir", "artifacts"))
     out_zip = Path(getattr(args, "out_zip", "learnings.zip"))
 
-    # Configuration pour ML traditionnel
+    # Configuration pour PyTorch
     cfg = TrainConfig(
-        # Paramètres ML (pas d'epochs/batch_size comme CNN)
-        model_type=getattr(args, "model_type", "svm"),  # svm, random_forest, knn
+        epochs=getattr(args, "epochs", 50),
+        batch_size=getattr(args, "batch_size", 32),
+        lr=getattr(args, "lr", 1e-3),
         valid_ratio=getattr(args, "valid_ratio", 0.2),
         seed=getattr(args, "seed", 42),
+        img_size=(getattr(args, "img_h", 224), getattr(args, "img_w", 224)),
         augment_train=getattr(args, "augment", True),
         augmentations_per_image=getattr(args, "aug_per_image", 3),
-        export_augmented_images=getattr(args, "export_images", False),
     )
 
-    # Composants ML traditionnels
+    # Composants
     scanner = DatasetScanner()
     splitter = DatasetSplitter()
     labels = LabelEncoder()
-    
-    # Moteurs d'augmentation et transformation
     aug_engine = AugmentationEngine.default_six()
     tf_engine = TransformationEngine.default_six()
-    
-    # Feature extractor (cœur du système ML)
-    feature_extractor = FeatureExtractor(tf_engine.tfs)
-    
-    # Model factory pour ML
-    model_factory = MLModelFactory()
+    model_factory = PyTorchModelFactory()
 
-    # Trainer ML
-    trainer = MLTrainer(
+    # Trainer PyTorch
+    trainer = PyTorchTrainer(
         dataset_scanner=scanner,
         dataset_splitter=splitter,
         augmentation_engine=aug_engine,
-        feature_extractor=feature_extractor,
+        transformation_engine=tf_engine,
         model_factory=model_factory,
         labels=labels,
     )
 
-    print(f"🚀 Starting ML training with {cfg.model_type.upper()}...")
+    print("=" * 60)
+    print("🍃 LEAFFLICTION - PyTorch Training Pipeline")
+    print("=" * 60)
     print(f"   Dataset: {dataset_dir}")
     print(f"   Augmentation: {'Enabled' if cfg.augment_train else 'Disabled'}")
     print(f"   Validation ratio: {cfg.valid_ratio:.0%}")
+    print(f"   Epochs: {cfg.epochs}")
+    print(f"   Batch size: {cfg.batch_size}")
+    print("=" * 60)
     print()
 
     # Entraînement
     metrics = trainer.train(dataset_dir=dataset_dir, out_dir=out_dir, cfg=cfg)
 
-    # Validation des contraintes (accuracy > 90%, valid >= 100)
+    # Vérification des contraintes
     gate = RequirementsGate()
     gate.assert_ok(metrics)
 
-    # Packaging final
+    # Zip final
     packager = TrainingPackager(zip_packager=ZipPackager())
     artifacts_dir = packager.prepare_artifacts_dir(tmp_dir=out_dir)
     packager.build_zip(artifacts_dir=artifacts_dir, out_zip=out_zip)
 
-    # Génération signature.txt
+    # Signature SHA1
+    print("🔐 Generating signature...")
     hasher = Hasher()
-    sha1_hash = hasher.ft_sha1_file(out_zip)
+    signature = hasher.ft_sha1_file(out_zip)
     signature_file = Path("signature.txt")
-    signature_file.write_text(sha1_hash + "\n")
-
+    signature_file.write_text(signature + "\n")
+    print(f"   Signature saved to {signature_file}")
     print()
+
     print("=" * 60)
     print("✅ Training completed successfully!")
     print("=" * 60)
     print(f"📊 Train accuracy: {metrics.train_accuracy:.2%}")
     print(f"📊 Valid accuracy: {metrics.valid_accuracy:.2%}")
     print(f"📊 Valid count: {metrics.valid_count}")
-    print(f"📦 Model saved to: {out_zip}")
-    print(f"📝 Signature saved to: {signature_file}")
-    print(f"   SHA1: {sha1_hash}")
+    print(f"📦 Model bundle: {out_zip}")
+    print(f"🔐 Signature: {signature_file}")
+    print(f"   SHA1: {signature}")
     print("=" * 60)
 
 
