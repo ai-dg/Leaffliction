@@ -4,7 +4,7 @@ from typing import Dict, Optional, Any
 from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib
-plt.style.use("./leaffliction.mplstyle")
+plt.style.use("./style/leaffliction.mplstyle")
 
 
 
@@ -39,7 +39,7 @@ class DistributionPlotter:
         counts_array = [value for key, value in counts.items()]
         class_names = list(counts.keys())
 
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize=(12, 17))
         plt.bar(class_names, counts_array)
         plt.title(title)
         plt.xlabel("Classes")

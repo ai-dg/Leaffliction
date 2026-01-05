@@ -21,6 +21,7 @@ def main() -> None:
     plotter = DistributionPlotter()
     plotter.plot_pie(index.counts, title=title)
     plotter.plot_bar(index.counts, title=title)
+    plotter.plot_both(index.counts, title)
 
 
 if __name__ == "__main__":
