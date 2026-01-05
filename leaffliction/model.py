@@ -4,25 +4,26 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
+import torch
+import torch.nn as nn
 
 
 @dataclass
 class ModelConfig:
-    """Configuration du modèle ML"""
+    """Configuration du modèle PyTorch"""
     num_classes: int = 0
+    input_channels: int = 6  # Nombre de transformations
+    img_size: Tuple[int, int] = (224, 224)
     seed: int = 42
-    model_type: str = "svm"  # "svm", "random_forest", "knn"
     extra: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class ModelPaths:
     """Chemins des fichiers du bundle"""
-    model_file: str = "model.pkl"
-    scaler_file: str = "scaler.pkl"
+    model_file: str = "model.pth"
     labels_file: str = "labels.json"
     config_file: str = "config.json"
-    feature_config_file: str = "feature_config.json"
 
 
 class LabelEncoder:
@@ -58,88 +59,154 @@ class LabelEncoder:
         raise NotImplementedError
 
 
-class MLModelFactory:
+class TransformationClassifier(nn.Module):
     """
-    Construit un modèle ML traditionnel (sklearn).
-    Supporte: SVM, Random Forest, KNN
+    Modèle PyTorch qui prend les transformations en entrée.
+    Input: (batch, n_transforms, H, W) où n_transforms = 6
     """
-
-    def build(self, cfg: ModelConfig) -> Any:
-        """
-        Construit un modèle sklearn selon cfg.model_type
+    def __init__(self, num_classes: int, input_channels: int = 6):
+        super().__init__()
         
-        model_type:
-        - "svm": SVC avec kernel RBF
-        - "random_forest": RandomForestClassifier
-        - "knn": KNeighborsClassifier
+        # Convolutions pour extraire features des transformations
+        self.features = nn.Sequential(
+            # Conv1: (6, 224, 224) → (32, 112, 112)
+            nn.Conv2d(input_channels, 32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            
+            # Conv2: (32, 112, 112) → (64, 56, 56)
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            
+            # Conv3: (64, 56, 56) → (128, 28, 28)
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            
+            # Conv4: (128, 28, 28) → (256, 14, 14)
+            nn.Conv2d(128, 256, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+        )
         
-        Retourne: modèle sklearn non entraîné
-        """
-        raise NotImplementedError
+        # Global Average Pooling
+        self.gap = nn.AdaptiveAvgPool2d(1)
+        
+        # Classifier
+        self.classifier = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(128, num_classes)
+        )
+    
+    def forward(self, x):
+        # x: (batch, 6, 224, 224)
+        x = self.features(x)      # (batch, 256, 14, 14)
+        x = self.gap(x)           # (batch, 256, 1, 1)
+        x = self.classifier(x)    # (batch, num_classes)
+        return x
 
 
-class MLModelBundle:
+class PyTorchModelFactory:
     """
-    Bundle complet pour sauvegarder/charger un modèle ML.
+    Construit un modèle PyTorch.
+    """
+
+    def build(self, cfg: ModelConfig) -> TransformationClassifier:
+        """
+        Construit un TransformationClassifier PyTorch.
+        
+        Retourne: modèle PyTorch non entraîné
+        """
+        model = TransformationClassifier(
+            num_classes=cfg.num_classes,
+            input_channels=cfg.input_channels
+        )
+        return model
+
+
+class PyTorchModelBundle:
+    """
+    Bundle complet pour sauvegarder/charger un modèle PyTorch.
     
     Contient:
-    - model: modèle sklearn entraîné
-    - scaler: StandardScaler pour normaliser les features
+    - model: modèle PyTorch entraîné
     - labels: LabelEncoder pour les classes
-    - feature_extractor: FeatureExtractor pour extraire features
+    - transformation_engine: TransformationEngine pour créer tensors
     - cfg: ModelConfig
     """
 
     def __init__(
         self,
-        model: Any,  # sklearn model
-        scaler: Any,  # StandardScaler
+        model: TransformationClassifier,
         labels: LabelEncoder,
-        feature_extractor: Any,  # FeatureExtractor
+        transformation_engine: Any,  # TransformationEngine
         cfg: ModelConfig,
         paths: Optional[ModelPaths] = None
     ) -> None:
         self.model = model
-        self.scaler = scaler
         self.labels = labels
-        self.feature_extractor = feature_extractor
+        self.transformation_engine = transformation_engine
         self.cfg = cfg
         self.paths = paths or ModelPaths()
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model.to(self.device)
 
     def save(self, out_dir: Path) -> None:
         """
         Sauvegarde le bundle dans out_dir/:
-        - model.pkl (sklearn model avec joblib)
-        - scaler.pkl (StandardScaler avec joblib)
+        - model.pth (PyTorch state_dict)
         - labels.json
         - config.json
-        - feature_config.json
         """
         raise NotImplementedError
 
     @classmethod
-    def load(cls, in_dir: Path) -> "MLModelBundle":
+    def load(cls, in_dir: Path) -> "PyTorchModelBundle":
         """
         Charge le bundle depuis in_dir/
         """
         raise NotImplementedError
 
     @classmethod
-    def load_from_zip(cls, zip_path: Path, extract_dir: Optional[Path] = None) -> "MLModelBundle":
+    def load_from_zip(cls, zip_path: Path, extract_dir: Optional[Path] = None) -> "PyTorchModelBundle":
         """
         Extrait le zip puis charge le bundle.
         """
         raise NotImplementedError
     
-    def predict(self, features: np.ndarray) -> Tuple[int, Dict[str, float]]:
+    def predict(self, tensor: torch.Tensor) -> Tuple[int, Dict[str, float]]:
         """
-        Prédit la classe depuis un vecteur de features.
+        Prédit la classe depuis un tensor de transformations.
         
         Args:
-            features: np.ndarray de shape (n_features,) ou (1, n_features)
+            tensor: torch.Tensor de shape (n_transforms, H, W) ou (1, n_transforms, H, W)
         
         Retourne:
             - pred_id: int (ID de la classe prédite)
             - probs: Dict[str, float] (probabilités par classe)
         """
-        raise NotImplementedError
+        self.model.eval()
+        
+        # Ajouter batch dimension si nécessaire
+        if tensor.dim() == 3:
+            tensor = tensor.unsqueeze(0)  # (1, n_transforms, H, W)
+        
+        tensor = tensor.to(self.device)
+        
+        with torch.no_grad():
+            outputs = self.model(tensor)
+            probs_tensor = torch.softmax(outputs, dim=1)
+            pred_id = torch.argmax(probs_tensor, dim=1).item()
+            
+            # Convertir probs en dict
+            probs_np = probs_tensor.cpu().numpy()[0]
+            probs = {
+                self.labels.decode(i): float(probs_np[i])
+                for i in range(len(probs_np))
+            }
+        
+        return pred_id, probs
