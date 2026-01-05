@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Any
 import tensorflow as tf
 from utils import PathManager
+from collections import Counter
 
 
 @dataclass
@@ -79,7 +80,14 @@ class DatasetSplitter:
         Retourne (train_items, valid_items)
         - stratified: conserve approx les proportions de classes
         """
-        raise NotImplementedError
+
+        cnt = Counter()
+        for item in items:
+            cnt[item[1]] += 1
+
+        
+
+
 
 
 @dataclass
