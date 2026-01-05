@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+import cv2
+import numpy as np
 
 from leaffliction.cli import CLIBuilder
 from leaffliction.utils import PathManager
@@ -14,22 +16,33 @@ def main() -> None:
 
     image_path = Path(args.image_path)
 
-    # TODO: charge l'image (tf / PIL / cv2) dans ta logique (utils/ImageIO par ex.)
-    # img = ...
+    # Charger l'image avec OpenCV (ML traditionnel)
+    img = cv2.imread(str(image_path))
+    if img is None:
+        print(f"Error: Could not load image from {image_path}")
+        return
+    
+    # Convertir BGR → RGB pour affichage correct
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
+    # Créer le moteur d'augmentation avec les 6 augmentations
     engine = AugmentationEngine.default_six()
-    # results = engine.apply_all(img)
-    results = {}  # placeholder
+    
+    # Appliquer toutes les augmentations
+    results = engine.apply_all(img)
 
-    # Affichage (original + 6)
+    # Affichage (original + 6 augmentations)
     grid = GridPlotter()
-    # grid.show_grid("Augmentations", results, original=img)
-    grid.show_grid("Augmentations", results, original=None)
+    grid.show_grid("Augmentations", results, original=img)
 
     # Sauvegarde des 6 images dans le même dossier
     pm = PathManager()
     saver = AugmentationSaver(pm)
-    saver.save_all(image_path, results)
+    saved_paths = saver.save_all(image_path, results)
+    
+    print(f"\n✅ Augmentations saved:")
+    for path in saved_paths:
+        print(f"   - {path.name}")
 
 
 if __name__ == "__main__":
