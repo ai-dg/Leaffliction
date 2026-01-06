@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional, Any
-# import tensorflow as tf
+from typing import Dict, List, Tuple
 from leaffliction.utils import PathManager
-from collections import Counter
-
+from random import Random
+from collections import defaultdict
 
 @dataclass
 class DatasetIndex:
@@ -81,4 +80,26 @@ class DatasetSplitter:
         - stratified: conserve approx les proportions de classes
         """
 
+        rdm = Random(seed)
+        train_items, valid_items = [], []
+        if stratified:
+            items_grouped = defaultdict(list)
+            for item in items:
+                items_grouped[item[1]].append(item)
+        
+            for class_id in items_grouped:
+                rdm.shuffle(items_grouped[class_id])
 
+            for class_id in items_grouped:
+                nb_valid_items = int(len(items_grouped[class_id]) * valid_ratio)
+                valid_items += items_grouped[class_id][:nb_valid_items + 1]
+                train_items += items_grouped[class_id][nb_valid_items:]
+
+            rdm.shuffle(valid_items)
+            rdm.shuffle(train_items)
+        else:
+            nb_valid_items = int(len(items) * valid_ratio)
+            valid_items = items[:nb_valid_items + 1]
+            train_items = items[nb_valid_items:]
+
+        return (train_items, valid_items)
