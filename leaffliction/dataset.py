@@ -80,34 +80,5 @@ class DatasetSplitter:
         Retourne (train_items, valid_items)
         - stratified: conserve approx les proportions de classes
         """
-        import random
-        random.seed(seed)
-        
-        if not stratified:
-            # Simple shuffle et split
-            items_copy = items.copy()
-            random.shuffle(items_copy)
-            split_idx = int(len(items_copy) * (1 - valid_ratio))
-            return items_copy[:split_idx], items_copy[split_idx:]
-        
-        # Stratifié: grouper par classe
-        class_items = {}
-        for path, label in items:
-            if label not in class_items:
-                class_items[label] = []
-            class_items[label].append((path, label))
-        
-        train_items = []
-        valid_items = []
-        
-        for label, items_list in class_items.items():
-            items_copy = items_list.copy()
-            random.shuffle(items_copy)
-            n_valid = int(len(items_copy) * valid_ratio)
-            valid_items.extend(items_copy[:n_valid])
-            train_items.extend(items_copy[n_valid:])
-        
-        random.shuffle(train_items)
-        random.shuffle(valid_items)
-        
-        return train_items, valid_items
+
+
