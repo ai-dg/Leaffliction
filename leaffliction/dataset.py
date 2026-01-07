@@ -3,19 +3,21 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Tuple
-from utils import PathManager
-# from leaffliction.utils import PathManager
+from leaffliction.utils import PathManager
 from random import Random
 from collections import defaultdict, Counter
+
 
 @dataclass
 class DatasetIndex:
     """
-    Représentation standard du dataset:
-    - root: dossier racine
-    - class_names: nom des sous-dossiers (classes)
-    - items: [(path_image, class_id), ...]
-    - counts: {class_name: count}
+    Immutable index describing an image classification dataset.
+
+    Attributes:
+        root: Root directory of the dataset.
+        class_names: Names of the class subdirectories.
+        items: List of (image_path, class_id) tuples.
+        counts: {class_name: count}
     """
     root: Path
     class_names: List[str]
@@ -24,49 +26,58 @@ class DatasetIndex:
 
     @property
     def num_classes(self) -> int:
+        """Number of distinct classes in the dataset."""
         return len(self.class_names)
 
     @property
     def size(self) -> int:
+        """Total number of items in the dataset."""
         return len(self.items)
 
 
 class DatasetScanner:
     """
-    Scan un dataset de type:
-    root/
-      class_a/
-        img1.jpg
-      class_b/
-        img2.jpg
+    Scans a directory-based image dataset and builds a DatasetIndex.
+
+    Expected directory structure::
+
+        root/
+            class_a/
+                img1.jpg
+                img2.jpg
+            class_b/
+                img2.jpg
     """
 
     def scan(self, root: Path) -> DatasetIndex:
-        """Construit un DatasetIndex depuis un dossier racine."""
+        """
+        Scan a dataset directory and build a DatasetIndex.
+
+        Args:
+            root: Path to the dataset root directory.
+
+        Returns:
+            A DatasetIndex containing paths, class IDs,
+            and dataset statistics.
+        """
         root = root.resolve()
         pm = PathManager()
-        
+
         lst_img = pm.iter_images(root, recursive=True)
 
-        class_names = []
-        items = []
-        counts = {}
-        for img in lst_img:
-            name = img.parent.name
-            if name not in class_names:
-                class_names.append(name)
-            items.append((img, class_names.index(name)))
-            if name not in counts:
-                counts[name] = 1
-            else:
-                counts[name] = counts[name] + 1
+        class_names = sorted({img.parent.name for img in lst_img})
+
+        class_to_id = {name: i for i, name in enumerate(class_names)}
+
+        items = [(img, class_to_id[img.parent.name]) for img in lst_img]
+        counts = dict(Counter(img.parent.name for img in lst_img))
 
         return DatasetIndex(root, class_names, items, counts)
 
 
 class DatasetSplitter:
     """
-    Split train/valid à partir de la liste items.
+    Utility class to split a dataset into training and validation sets.
     """
 
     def split(
@@ -77,75 +88,41 @@ class DatasetSplitter:
         stratified: bool = True
     ) -> Tuple[List[Tuple[Path, int]], List[Tuple[Path, int]]]:
         """
-        Retourne (train_items, valid_items)
-        - stratified: conserve approx les proportions de classes
+        Split items into training and validation subsets.
+
+        If stratified is True, a least one sample per class is assigned
+        to the validation set when possible.
+
+        Args:
+            items: List of (image_path, class_id) tuples.
+            valid_ratio: Fraction of items to use for validation.
+            seed: Random seed for reproducible shuffling.
+            stratified: If True, preserve class proportions approximately.
+
+        Returns:
+            A tuple (train_items, valid_items).
         """
 
         rdm = Random(seed)
+        if not stratified:
+            items_copy = items.copy()
+            rdm.shuffle(items_copy)
+            split_idx = max(1, int(len(items_copy) * (1 - valid_ratio)))
+            return items_copy[:split_idx], items_copy[split_idx:]
+
         train_items, valid_items = [], []
-        if stratified:
-            items_grouped = defaultdict(list)
-            for item in items:
-                items_grouped[item[1]].append(item)
-        
-            for class_id in items_grouped:
-                rdm.shuffle(items_grouped[class_id])
+        items_grouped = defaultdict(list)
+        for item in items:
+            items_grouped[item[1]].append(item)
 
-            for class_id in items_grouped:
-                nb_valid_items = int(len(items_grouped[class_id]) * valid_ratio)
-                valid_items.extend(items_grouped[class_id][:nb_valid_items])
-                train_items.extend(items_grouped[class_id][nb_valid_items:])
+        for class_id in sorted(items_grouped):
+            rdm.shuffle(items_grouped[class_id])
 
-            rdm.shuffle(valid_items)
-            rdm.shuffle(train_items)
-        else:
-            shuffled_items = items.copy()
-            rdm.shuffle(shuffled_items)
-            nb_valid_items = int(len(shuffled_items) * valid_ratio)
-            valid_items = shuffled_items[:nb_valid_items]
-            train_items = shuffled_items[nb_valid_items:]
+        for class_id in sorted(items_grouped):
+            split_idx = max(1, int(len(items_grouped[class_id]) * valid_ratio))
+            valid_items.extend(items_grouped[class_id][:split_idx])
+            train_items.extend(items_grouped[class_id][split_idx:])
 
+        rdm.shuffle(valid_items)
+        rdm.shuffle(train_items)
         return (train_items, valid_items)
-
-    def display_split(
-        self,
-        train_items: List[Tuple[Path, int]],
-        valid_items: List[Tuple[Path, int]],
-        n_samples: int = 3
-    ) -> None:
-        """Display split statistics and sample items."""
-        train_classes = Counter(item[1] for item in train_items)
-        valid_classes = Counter(item[1] for item in valid_items)
-        
-        print("=" * 60)
-        print("DATASET SPLIT STATISTICS")
-        print("=" * 60)
-        print(f"Train items: {len(train_items)}")
-        print(f"Valid items: {len(valid_items)}")
-        print(f"Total: {len(train_items) + len(valid_items)}")
-        print()
-        print(f"Train class distribution: {dict(train_classes)}")
-        print(f"Valid class distribution: {dict(valid_classes)}")
-        print()
-        print(f"First {n_samples} TRAIN items:")
-        for item in train_items[:n_samples]:
-            print(f"  {item[0].name} (class_id: {item[1]})")
-        print()
-        print(f"First {n_samples} VALID items:")
-        for item in valid_items[:n_samples]:
-            print(f"  {item[0].name} (class_id: {item[1]})")
-        print("=" * 60)
-
-def main():
-    scanner = DatasetScanner()
-    dataset = scanner.scan(Path("leaves"))
-    
-    print(dataset.counts)
-
-    splitter = DatasetSplitter()
-    train_items, valid_items = splitter.split(dataset.items, 0.2, 4)
-    
-    splitter.display_split(train_items, valid_items, n_samples=5)
-
-if __name__ == "__main__":
-    main()
