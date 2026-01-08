@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Any, List, Protocol, Tuple
 import numpy as np
+import albumentations as A
 
 
 class Augmentation(Protocol):
@@ -83,8 +84,15 @@ class AugmentationEngine:
     2. Augmentation du dataset de training - augment_dataset()
     """
 
-    def __init__(self, augs: List[Augmentation]) -> None:
-        self.augs = augs
+    def __init__(self) -> None:
+        self.augs = {
+            "Flip": A.HorizontalFlip(p=1.0),
+            "Rotate": A.Rotate(
+                limit=(-15,15),
+                p=1.0
+            ),
+            "Skew": A.
+        }
 
     @classmethod
     def default_six(cls) -> "AugmentationEngine":
@@ -97,9 +105,10 @@ class AugmentationEngine:
         """Applique toutes les augmentations pour visualisation"""
         raise NotImplementedError
     
-    def apply_random(self, img: np.ndarray, n: int = 2) -> np.ndarray:
-        """Applique n augmentations aléatoires"""
-        raise NotImplementedError
+    # TODO - Remove apply_random
+    # def apply_random(self, img: np.ndarray, n: int = 2) -> np.ndarray:
+    #     """Applique n augmentations aléatoires"""
+    #     raise NotImplementedError
     
     def augment_dataset(
         self,
