@@ -1,0 +1,14 @@
+[project]
+name = "leaffliction"
+version = "0.1.0"
+description = "Image classification by disease recognition on leaves"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "matplotlib>=3.10.8",
+    "numpy>=2.4.0",
+    "opencv-python>=4.11.0.86",
+    "plantcv>=4.10",
+    "torch>=2.9.1",
+    "torchvision>=0.24.1",
+]
