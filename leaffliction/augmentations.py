@@ -6,72 +6,73 @@ from typing import Dict, Any, List, Protocol, Tuple
 import numpy as np
 import albumentations as A
 
+# TODO - remove commented out code & every reference/dependencies in the
+#        codebase
+# class Augmentation(Protocol):
+#     """
+#     Interface d'une augmentation.
+#     'name' sert au suffix (_Flip, _Rotate, etc.)
+#     """
 
-class Augmentation(Protocol):
-    """
-    Interface d'une augmentation.
-    'name' sert au suffix (_Flip, _Rotate, etc.)
-    """
+#     @property
+#     def name(self) -> str:
+#         ...
 
-    @property
-    def name(self) -> str:
-        ...
-
-    def apply(self, img: np.ndarray) -> np.ndarray:
-        ...
-
-
-@dataclass
-class FlipHorizontalAug:
-    name: str = "FlipH"
-
-    def apply(self, img: np.ndarray) -> np.ndarray:
-        raise NotImplementedError
+#     def apply(self, img: np.ndarray) -> np.ndarray:
+#         ...
 
 
-@dataclass
-class FlipVerticalAug:
-    name: str = "FlipV"
+# @dataclass
+# class FlipHorizontalAug:
+#     name: str = "FlipH"
 
-    def apply(self, img: np.ndarray) -> np.ndarray:
-        raise NotImplementedError
-
-
-@dataclass
-class RotateAug:
-    angle: float
-    name: str = "Rotate"
-
-    def apply(self, img: np.ndarray) -> np.ndarray:
-        raise NotImplementedError
+#     def apply(self, img: np.ndarray) -> np.ndarray:
+#         raise NotImplementedError
 
 
-@dataclass
-class BrightnessContrastAug:
-    brightness: float = 0.0
-    contrast: float = 0.0
-    name: str = "BrightContrast"
+# @dataclass
+# class FlipVerticalAug:
+#     name: str = "FlipV"
 
-    def apply(self, img: np.ndarray) -> np.ndarray:
-        raise NotImplementedError
+#     def apply(self, img: np.ndarray) -> np.ndarray:
+#         raise NotImplementedError
 
 
-@dataclass
-class GaussianBlurAug:
-    sigma: float = 1.0
-    name: str = "Blur"
+# @dataclass
+# class RotateAug:
+#     angle: float
+#     name: str = "Rotate"
 
-    def apply(self, img: np.ndarray) -> np.ndarray:
-        raise NotImplementedError
+#     def apply(self, img: np.ndarray) -> np.ndarray:
+#         raise NotImplementedError
 
 
-@dataclass
-class RandomCropResizeAug:
-    crop_ratio: float = 0.9
-    name: str = "CropResize"
+# @dataclass
+# class BrightnessContrastAug:
+#     brightness: float = 0.0
+#     contrast: float = 0.0
+#     name: str = "BrightContrast"
 
-    def apply(self, img: np.ndarray) -> np.ndarray:
-        raise NotImplementedError
+#     def apply(self, img: np.ndarray) -> np.ndarray:
+#         raise NotImplementedError
+
+
+# @dataclass
+# class GaussianBlurAug:
+#     sigma: float = 1.0
+#     name: str = "Blur"
+
+#     def apply(self, img: np.ndarray) -> np.ndarray:
+#         raise NotImplementedError
+
+
+# @dataclass
+# class RandomCropResizeAug:
+#     crop_ratio: float = 0.9
+#     name: str = "CropResize"
+
+#     def apply(self, img: np.ndarray) -> np.ndarray:
+#         raise NotImplementedError
 
 
 class AugmentationEngine:
@@ -84,28 +85,31 @@ class AugmentationEngine:
     2. Augmentation du dataset de training - augment_dataset()
     """
 
-    def __init__(self) -> None:
-        self.augs = {
-            "Flip": A.HorizontalFlip(p=1.0),
-            "Rotate": A.Rotate(
-                limit=(-15,15),
-                p=1.0
-            ),
-            "Skew": A.
-        }
+    augs = {
+        "FlipH": A.HorizontalFlip(p=1.0),
+        "Rotate": A.Rotate(
+            limit=(-15,15),
+            p=1.0
+        ),
+        "Shear": None,
+        "Blur": None,
+        "Crop": None,
+        "Distortion": None,
+    }
 
-    @classmethod
-    def default_six(cls) -> "AugmentationEngine":
-        """
-        Factory: les 6 augmentations mandatory.
-        """
-        raise NotImplementedError
+    # TODO - Remove default_six everywhere in the codebase and refac
+    # @classmethod
+    # def default_six(cls) -> "AugmentationEngine":
+    #     """
+    #     Factory: les 6 augmentations mandatory.
+    #     """
+    #     raise NotImplementedError
 
     def apply_all(self, img: np.ndarray) -> Dict[str, np.ndarray]:
         """Applique toutes les augmentations pour visualisation"""
-        raise NotImplementedError
+        return { name: result["image"] for (name, result) in self.augs.items()}
     
-    # TODO - Remove apply_random
+    # TODO - Remove apply_random everywhere in the codebase and refac
     # def apply_random(self, img: np.ndarray, n: int = 2) -> np.ndarray:
     #     """Applique n augmentations aléatoires"""
     #     raise NotImplementedError
@@ -113,8 +117,8 @@ class AugmentationEngine:
     def augment_dataset(
         self,
         train_items: List[Tuple[Path, int]],
+        train_items_grouped: Dict[int, List[Tuple[Path, int]]],
         output_dir: Path,
-        augmentations_per_image: int = 3
     ) -> List[Tuple[Path, int]]:
         """
         Pour chaque image de train:
