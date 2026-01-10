@@ -7,6 +7,7 @@ import numpy as np
 import albumentations as A
 from leaffliction.utils import PathManager
 from random import Random
+from collections import defaultdict
 
 # TODO - remove commented out code & every reference/dependencies in the
 #        codebase
@@ -128,8 +129,8 @@ class AugmentationEngine:
     def augment_dataset(
         self,
         train_items: List[Tuple[Path, int]],
-        train_items_grouped: Dict[int, List[Tuple[Path, int]]],
         seed: int,
+        dataset_dir: Path,
         output_dir: Path,
     ) -> List[Tuple[Path, int]]:
         """
@@ -144,28 +145,42 @@ class AugmentationEngine:
         """
         pm = PathManager()
 
+        train_items_grouped = defaultdict(list)
+        for item in train_items:
+            train_items_grouped[item[1]].append(item)
+
         target_count = len(max(train_items_grouped.values(), key=len))
 
-        augmentations = self.augs.keys()
+        augmentations = list(self.augs.keys())
         nb_augs = len(augmentations)
 
-        for class_items in train_items_grouped.items():
-            current_count = len(class_items)
+        # print(target_count)
+        # print(nb_augs)
+
+        for class_item in train_items_grouped:
+            items = train_items_grouped[class_item]
+            current_count = len(items)
             deficit = target_count - current_count
+            # print("class: ", class_item)
+            # print("current count: ", current_count)
+            # print("deficit: ", deficit)
 
             for gen_img_count in range(deficit):
                 augm_name = augmentations[gen_img_count % nb_augs]
-                item = class_items[gen_img_count // nb_augs % current_count]
+                item = items[(gen_img_count // nb_augs) % current_count]
 
                 image = cv2.imread(str(item[0]), cv2.IMREAD_COLOR_RGB)
+                
 
                 result = self.augs[augm_name](image=image)
                 transformed_image = result['image']
 
-                img_transform_id = gen_img_count % current_count
+                img_transform_id = (gen_img_count // nb_augs) % current_count
                 augm_path = pm.make_suffixed_path(
-                    item[0], f"{augm_name}{img_transform_id}"
+                    pm.mirror_path(item[0], dataset_dir, output_dir),
+                    f"{augm_name}{img_transform_id}"
                 )
+                pm.ensure_dir(augm_path.parent)
                 cv2.imwrite(str(augm_path), transformed_image)
                 train_items.append((augm_path, item[1]))
         
@@ -190,3 +205,30 @@ class AugmentationSaver:
         Exemple attendu: image (1)_Flip.JPG, image (1)_Rotate.JPG, etc.
         """
         raise NotImplementedError
+
+def main():
+    from leaffliction.dataset import DatasetScanner, DatasetIndex, DatasetSplitter
+
+    dataset_dir = Path("leaves")
+    out_dir = Path("artifacts")
+    aug_dir = out_dir / "augmented"
+    scanner = DatasetScanner()
+    index = scanner.scan(dataset_dir)
+    
+    splitter = DatasetSplitter()
+    train_items, valid_items = splitter.split(index.items, 0.2, 42, stratified=True)
+
+    augmentation_engine = AugmentationEngine()
+    train_items = augmentation_engine.augment_dataset(
+        train_items,
+        42,
+        dataset_dir,
+        aug_dir
+    )
+
+    index_aug = scanner.scan(out_dir)
+    print(index_aug.counts)
+    print(index.counts)
+
+if __name__ == "__main__":
+    main()
