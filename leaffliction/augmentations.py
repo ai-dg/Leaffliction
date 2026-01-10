@@ -93,9 +93,12 @@ class AugmentationEngine:
             limit=(-15,15),
             p=1.0
         ),
-        "Blur": A.Blur(p=1.0),
+        "Blur": A.Blur(
+            blur_limit=(5,9),
+            p=1.0
+        ),
         "Contrast": A.ColorJitter(
-            contrast=(0.8, 1.2),
+            contrast=(1.4, 2),
             p=1.0
         ),
         "Scaling": A.Affine(
@@ -103,10 +106,14 @@ class AugmentationEngine:
             p=1.0
         ),
         "Illumination": A.ColorJitter(
-            brightness=(0.8, 1.2),
+            brightness=(1.4, 2),
             p=1.0
         ),
-        "Projective": A.Perspective(p=1.0),
+        "Projective": A.Perspective(
+            fit_output=True,
+            scale=(0.05, 0.2),
+            p=1.0
+        ),
     }
 
     # TODO - Remove default_six everywhere in the codebase and refac
