@@ -5,6 +5,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib
 plt.style.use("./style/leaffliction.mplstyle")
+import numpy as np
+from math import ceil
 
 
 
@@ -98,13 +100,41 @@ class GridPlotter:
     def show_grid(
         self,
         title: str,
-        images: Dict[str, Any],
-        original: Optional[Any] = None,
+        images: Dict[str, np.ndarray],
+        original: Optional[np.ndarray] = None,
         save_to: Optional[Path] = None,
         max_cols: int = 3
     ) -> None:
-        raise NotImplementedError
 
+        plt.suptitle(title)
+
+        nb_images = len(images)
+        if original is not None:
+            nb_images += 1
+        
+        rows = ceil(nb_images / max_cols)
+        
+        plot_idx = 1
+        
+        if original is not None:
+            plt.subplot(rows, max_cols, plot_idx)
+            plt.axis('off')
+            plt.imshow(original)
+            plt.title("Original")
+            plot_idx += 1
+
+        for transformation, img in images.items():
+            plt.subplot(rows, max_cols, plot_idx)
+            plt.axis('off')
+            plt.imshow(img)
+            plt.title(transformation)
+            plot_idx += 1
+
+        if save_to is not None:
+            plt.savefig(save_to)
+        
+        plt.show()
+        plt.close()
 
 
 def main():

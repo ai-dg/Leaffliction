@@ -46,7 +46,7 @@ class PathManager:
             input:  /a/b/image1.JPG  + suffix="Flip"
             output: /a/b/image1_Flip.JPG
         """
-        new_name = f"{image_path.stem}_{suffix}{image_path.suffix}"
+        new_name = f"{image_path.stem}{suffix}{image_path.suffix}"
         new_path = image_path.with_name(new_name)
         return new_path
 
@@ -66,7 +66,7 @@ class PathManager:
         # print(src_path)
         # print(src_root)
         # print(target_root)
-        relative = src_path.relative_to(src_root.resolve())
+        relative = src_path.resolve().relative_to(src_root.resolve())
         return target_root / relative
 
     def iter_images(

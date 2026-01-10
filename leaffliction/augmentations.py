@@ -119,7 +119,7 @@ class AugmentationEngine:
 
     def apply_all(self, img: np.ndarray) -> Dict[str, np.ndarray]:
         """Applique toutes les augmentations pour visualisation"""
-        return { name: result["image"] for (name, result) in self.augs.items()}
+        return { name: augmentation(image=img)['image'] for (name, augmentation) in self.augs.items()}
     
     # TODO - Remove apply_random everywhere in the codebase and refac
     # def apply_random(self, img: np.ndarray, n: int = 2) -> np.ndarray:
@@ -178,7 +178,7 @@ class AugmentationEngine:
                 img_transform_id = (gen_img_count // nb_augs) % current_count
                 augm_path = pm.make_suffixed_path(
                     pm.mirror_path(item[0], dataset_dir, output_dir),
-                    f"{augm_name}{img_transform_id}"
+                    f"_{augm_name}{img_transform_id}"
                 )
                 pm.ensure_dir(augm_path.parent)
                 cv2.imwrite(str(augm_path), transformed_image)
@@ -199,12 +199,33 @@ class AugmentationSaver:
     def __init__(self, path_manager: Any) -> None:
         self.path_manager = path_manager
 
-    def save_all(self, image_path: Path, results: Dict[str, np.ndarray]) -> List[Path]:
+    def save_all(
+            self,
+            image_path: Path,
+            dataset_dir: Path,
+            output_dir: Path,
+            results: Dict[str, np.ndarray]
+        ) -> List[Path]:
         """
         Renvoie la liste des paths écrits.
         Exemple attendu: image (1)_Flip.JPG, image (1)_Rotate.JPG, etc.
         """
-        raise NotImplementedError
+        pm = PathManager()
+        saved_paths = []
+        for transformation in results:
+            
+            transformed_image = results[transformation]
+
+            augm_path = pm.make_suffixed_path(
+                pm.mirror_path(image_path, dataset_dir, output_dir),
+                f"_{transformation}",
+            )
+            pm.ensure_dir(augm_path.parent)
+            cv2.imwrite(str(augm_path), transformed_image)
+            saved_paths.append(augm_path)
+        
+        return saved_paths
+
 
 def main():
     from leaffliction.dataset import DatasetScanner, DatasetIndex, DatasetSplitter
