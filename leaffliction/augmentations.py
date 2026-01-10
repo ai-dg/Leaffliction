@@ -114,9 +114,14 @@ class AugmentationEngine:
 
 class AugmentationSaver:
     """
-    Sauvegarde les images augmentées dans le même dossier
-    avec suffixes conformes au sujet.
-    Utilisé par Augmentation.py pour la visualisation.
+    Utility class to save augmentation images. Tailored specifically
+    for evaluation.
+
+    The augmented images are saved in a separate folder from
+    the original dataset for more flexibility, with suffixes 
+    corresponding to the applied transformation.
+
+    Used by Augmentation.py for visualization.
     """
 
     def __init__(self, path_manager: Any) -> None:
@@ -130,8 +135,19 @@ class AugmentationSaver:
             results: Dict[str, np.ndarray]
         ) -> List[Path]:
         """
-        Renvoie la liste des paths écrits.
-        Exemple attendu: image (1)_Flip.JPG, image (1)_Rotate.JPG, etc.
+        Saves all augmentation for the provided into the specified directory.
+
+        Args:
+            image_path: The path to the processed image
+            dataset_dir: The path of the original dataset
+            output_dir: The root directory of the desired output
+            results: The resutls of the different augmentations
+
+        Returns:
+            List of path of saved augmentations.
+        
+        Example:
+            image (1)_Flip.JPG, image (1)_Rotate.JPG, etc.
         """
         pm = PathManager()
         saved_paths = []
