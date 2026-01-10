@@ -46,10 +46,28 @@ class PathManager:
             input:  /a/b/image1.JPG  + suffix="Flip"
             output: /a/b/image1_Flip.JPG
         """
-        new_name = f"{image_path.stem}{suffix}{image_path.suffix}"
+        new_name = f"{image_path.stem}_{suffix}{image_path.suffix}"
         new_path = image_path.with_name(new_name)
-        image_path = image_path.rename(new_path)
-        return image_path
+        return new_path
+
+    def mirror_path(self, src_path: Path, src_root: Path, target_root: Path) -> Path:
+        """
+        Given a source file, a source root, and a target root, returns the
+        mirror path of the source file respect to the target root.
+        
+        Args:
+            src_path: Path to the source file to mirror
+            src_root: Path to the root directory of the source file
+            target_root: Path to the root of the mirror path
+
+        Returns:
+            The path to the mirrored source file.
+        """
+        # print(src_path)
+        # print(src_root)
+        # print(target_root)
+        relative = src_path.relative_to(src_root.resolve())
+        return target_root / relative
 
     def iter_images(
             self,
