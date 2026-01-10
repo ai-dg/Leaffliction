@@ -9,74 +9,6 @@ from leaffliction.utils import PathManager
 from random import Random
 from collections import defaultdict
 
-# TODO - remove commented out code & every reference/dependencies in the
-#        codebase
-# class Augmentation(Protocol):
-#     """
-#     Interface d'une augmentation.
-#     'name' sert au suffix (_Flip, _Rotate, etc.)
-#     """
-
-#     @property
-#     def name(self) -> str:
-#         ...
-
-#     def apply(self, img: np.ndarray) -> np.ndarray:
-#         ...
-
-
-# @dataclass
-# class FlipHorizontalAug:
-#     name: str = "FlipH"
-
-#     def apply(self, img: np.ndarray) -> np.ndarray:
-#         raise NotImplementedError
-
-
-# @dataclass
-# class FlipVerticalAug:
-#     name: str = "FlipV"
-
-#     def apply(self, img: np.ndarray) -> np.ndarray:
-#         raise NotImplementedError
-
-
-# @dataclass
-# class RotateAug:
-#     angle: float
-#     name: str = "Rotate"
-
-#     def apply(self, img: np.ndarray) -> np.ndarray:
-#         raise NotImplementedError
-
-
-# @dataclass
-# class BrightnessContrastAug:
-#     brightness: float = 0.0
-#     contrast: float = 0.0
-#     name: str = "BrightContrast"
-
-#     def apply(self, img: np.ndarray) -> np.ndarray:
-#         raise NotImplementedError
-
-
-# @dataclass
-# class GaussianBlurAug:
-#     sigma: float = 1.0
-#     name: str = "Blur"
-
-#     def apply(self, img: np.ndarray) -> np.ndarray:
-#         raise NotImplementedError
-
-
-# @dataclass
-# class RandomCropResizeAug:
-#     crop_ratio: float = 0.9
-#     name: str = "CropResize"
-
-#     def apply(self, img: np.ndarray) -> np.ndarray:
-#         raise NotImplementedError
-
 
 class AugmentationEngine:
     """
@@ -116,22 +48,12 @@ class AugmentationEngine:
         ),
     }
 
-    # TODO - Remove default_six everywhere in the codebase and refac
-    # @classmethod
-    # def default_six(cls) -> "AugmentationEngine":
-    #     """
-    #     Factory: les 6 augmentations mandatory.
-    #     """
-    #     raise NotImplementedError
-
     def apply_all(self, img: np.ndarray) -> Dict[str, np.ndarray]:
         """Applique toutes les augmentations pour visualisation"""
-        return { name: augmentation(image=img)['image'] for (name, augmentation) in self.augs.items()}
-    
-    # TODO - Remove apply_random everywhere in the codebase and refac
-    # def apply_random(self, img: np.ndarray, n: int = 2) -> np.ndarray:
-    #     """Applique n augmentations aléatoires"""
-    #     raise NotImplementedError
+        return {
+            name: augmentation(image=img)['image']
+            for (name, augmentation) in self.augs.items()
+            }
     
     def augment_dataset(
         self,
@@ -161,16 +83,10 @@ class AugmentationEngine:
         augmentations = list(self.augs.keys())
         nb_augs = len(augmentations)
 
-        # print(target_count)
-        # print(nb_augs)
-
         for class_item in train_items_grouped:
             items = train_items_grouped[class_item]
             current_count = len(items)
             deficit = target_count - current_count
-            # print("class: ", class_item)
-            # print("current count: ", current_count)
-            # print("deficit: ", deficit)
 
             for gen_img_count in range(deficit):
                 augm_name = augmentations[gen_img_count % nb_augs]
@@ -232,31 +148,3 @@ class AugmentationSaver:
             saved_paths.append(augm_path)
         
         return saved_paths
-
-
-def main():
-    from leaffliction.dataset import DatasetScanner, DatasetIndex, DatasetSplitter
-
-    dataset_dir = Path("leaves")
-    out_dir = Path("artifacts")
-    aug_dir = out_dir / "augmented"
-    scanner = DatasetScanner()
-    index = scanner.scan(dataset_dir)
-    
-    splitter = DatasetSplitter()
-    train_items, valid_items = splitter.split(index.items, 0.2, 42, stratified=True)
-
-    augmentation_engine = AugmentationEngine()
-    train_items = augmentation_engine.augment_dataset(
-        train_items,
-        42,
-        dataset_dir,
-        aug_dir
-    )
-
-    index_aug = scanner.scan(out_dir)
-    print(index_aug.counts)
-    print(index.counts)
-
-if __name__ == "__main__":
-    main()

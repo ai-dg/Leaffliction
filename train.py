@@ -35,7 +35,7 @@ def main() -> None:
     scanner = DatasetScanner()
     splitter = DatasetSplitter()
     labels = LabelEncoder()
-    aug_engine = AugmentationEngine.default_six()
+    aug_engine = AugmentationEngine()
     tf_engine = TransformationEngine.default_six()
     model_factory = PyTorchModelFactory()
 
