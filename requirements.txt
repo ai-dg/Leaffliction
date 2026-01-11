@@ -11,6 +11,7 @@ dask==2025.12.0
 dask-jobqueue==0.9.0
 distributed==2025.12.0
 filelock==3.20.2
+flake8==7.3.0
 flyr==4.0.0
 fonttools==4.61.1
 fsspec==2025.12.0
@@ -25,6 +26,7 @@ lazy-loader==0.4
 locket==1.0.0
 markupsafe==3.0.3
 matplotlib==3.10.8
+mccabe==0.7.0
 mpmath==1.3.0
 msgpack==1.1.2
 narwhals==2.15.0
@@ -56,9 +58,11 @@ patsy==1.0.2
 pillow==12.1.0
 plantcv==4.10
 psutil==7.2.1
+pycodestyle==2.14.0
 pydantic==2.12.5
 pydantic-core==2.41.5
 pydantic-extra-types==2.11.0
+pyflakes==3.4.0
 pyparsing==3.3.1
 python-dateutil==2.9.0.post0
 pytz==2025.2

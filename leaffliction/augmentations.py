@@ -12,21 +12,24 @@ from collections import defaultdict
 
 class AugmentationEngine:
     """
-    Applique une liste d'augmentations et retourne un dict:
-    { "FlipH": img1, "Rotate": img2, ... }
-    
-    Utilisé pour:
-    1. Visualisation (Augmentation.py) - apply_all()
-    2. Augmentation du dataset de training - augment_dataset()
+    Engine responsible for applying image augmentations and balancing
+    a training dataset through image transforms.
+
+    This class defines a fixed set of augmentation transforms and applies
+    them iteratively to under-represented classes until all classes reach
+    a comparable number of samples.
+
+    Augmented images are generated with controlled randomness and saved
+    to disk as new dataset items.
     """
 
     augs = {
         "Rotate": A.Rotate(
-            limit=(-15,15),
+            limit=(-15, 15),
             p=1.0
         ),
         "Blur": A.Blur(
-            blur_limit=(5,9),
+            blur_limit=(5, 9),
             p=1.0
         ),
         "Contrast": A.ColorJitter(
@@ -49,12 +52,23 @@ class AugmentationEngine:
     }
 
     def apply_all(self, img: np.ndarray) -> Dict[str, np.ndarray]:
-        """Applique toutes les augmentations pour visualisation"""
+        """
+        Apply all defined augmentations to a single image.
+
+        This method is primarily intended for visualization and inspection
+        of the available transformations.
+
+        Args:
+            img: the image to process in a Matlike format.
+
+        Returns:
+            A dictionary mapping augmentation names to their resulting images.
+        """
         return {
             name: augmentation(image=img)['image']
-            for (name, augmentation) in self.augs.items()
+            for name, augmentation in self.augs.items()
             }
-    
+
     def augment_dataset(
         self,
         train_items: List[Tuple[Path, int]],
@@ -63,14 +77,21 @@ class AugmentationEngine:
         output_dir: Path,
     ) -> List[Tuple[Path, int]]:
         """
-        Pour chaque image de train:
-        1. Applique N augmentations différentes
-        2. Sauvegarde les nouvelles images sur disque
-        3. Retourne la liste étendue: originales + augmentées
-        
-        Exemple:
-        Input: 400 images Apple_healthy
-        Output: 400 originales + 1200 augmentées = 1600 images
+        Augment the training dataset to balance class distributions.
+
+        For each under-represented class, augmentations are applied
+        iteratively to existing images until the class reaches the
+        target number of samples. If all images are exhausted and the
+        deficit remains, the process restarts with randomized transforms.
+
+        Args:
+            train_items: Training set as (image_path, class_id) tuples.
+            seed: Random seed for reproducible shuffling.
+            dataset_dir: Root directory of the original dataset
+            output_dir: Root directory where augmented images are saved.
+
+        Returns:
+            The augmented training set, including newly generated samples.
         """
         pm = PathManager()
 
@@ -83,17 +104,18 @@ class AugmentationEngine:
         augmentations = list(self.augs.keys())
         nb_augs = len(augmentations)
 
-        for class_item in train_items_grouped:
-            items = train_items_grouped[class_item]
+        augmented_items = []
+        for class_id, items in train_items_grouped.items():
             current_count = len(items)
             deficit = target_count - current_count
 
+            # Use a round-robin strategy to cycle through augmentations
+            # and source images evenly when generating new samples.
             for gen_img_count in range(deficit):
                 augm_name = augmentations[gen_img_count % nb_augs]
                 item = items[(gen_img_count // nb_augs) % current_count]
 
                 image = cv2.imread(str(item[0]), cv2.IMREAD_COLOR_RGB)
-                
 
                 result = self.augs[augm_name](image=image)
                 transformed_image = result['image']
@@ -105,23 +127,22 @@ class AugmentationEngine:
                 )
                 pm.ensure_dir(augm_path.parent)
                 cv2.imwrite(str(augm_path), transformed_image)
-                train_items.append((augm_path, item[1]))
-        
-        rdm = Random(seed) 
+                augmented_items.append((augm_path, item[1]))
+
+        train_items.extend(augmented_items)
+        rdm = Random(seed)
         rdm.shuffle(train_items)
         return train_items
 
 
 class AugmentationSaver:
     """
-    Utility class to save augmentation images. Tailored specifically
-    for evaluation.
+    Utility class for saving augmented images to disk.
 
-    The augmented images are saved in a separate folder from
-    the original dataset for more flexibility, with suffixes 
-    corresponding to the applied transformation.
-
-    Used by Augmentation.py for visualization.
+    Augmented images are written to a separate directory from the
+    original dataset, with filename suffixes indicating the applied
+    transformations. This class is primarily intended for evaluation
+    and visualization purposes.
     """
 
     def __init__(self, path_manager: Any) -> None:
@@ -133,34 +154,34 @@ class AugmentationSaver:
             dataset_dir: Path,
             output_dir: Path,
             results: Dict[str, np.ndarray]
-        ) -> List[Path]:
+    ) -> List[Path]:
         """
-        Saves all augmentation for the provided into the specified directory.
+        Saves all augmented versions of an image to disk.
 
         Args:
-            image_path: The path to the processed image
-            dataset_dir: The path of the original dataset
-            output_dir: The root directory of the desired output
-            results: The resutls of the different augmentations
+            image_path: Path to the original image
+            dataset_dir: Root directory of the original dataset
+            output_dir: Root directory where augmented images are saved.
+            results: Mapping of augmentation names to transformed images.
 
         Returns:
-            List of path of saved augmentations.
-        
-        Example:
-            image (1)_Flip.JPG, image (1)_Rotate.JPG, etc.
+            List of paths to the saved augmented images.
         """
-        pm = PathManager()
         saved_paths = []
         for transformation in results:
-            
+
             transformed_image = results[transformation]
 
-            augm_path = pm.make_suffixed_path(
-                pm.mirror_path(image_path, dataset_dir, output_dir),
+            augm_path = self.path_manager.make_suffixed_path(
+                self.path_manager.mirror_path(
+                    image_path,
+                    dataset_dir,
+                    output_dir
+                ),
                 f"_{transformation}",
             )
-            pm.ensure_dir(augm_path.parent)
+            self.path_manager.ensure_dir(augm_path.parent)
             cv2.imwrite(str(augm_path), transformed_image)
             saved_paths.append(augm_path)
-        
+
         return saved_paths
