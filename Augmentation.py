@@ -12,10 +12,8 @@ from leaffliction.plotting import GridPlotter
 def main() -> None:
     parser = CLIBuilder().build_augmentation_parser()
     args = parser.parse_args()
-    # TODO - add the two varaibales below as parameter in cli
-    output_dir = Path("evaluation/augmented")
-    dataset_dir = Path("leaves")
 
+    output_dir = Path(args.output_dir)
     image_path = Path(args.image_path)
 
     img = cv2.imread(str(image_path))
@@ -34,7 +32,7 @@ def main() -> None:
 
     pm = PathManager()
     saver = AugmentationSaver(pm)
-    saved_paths = saver.save_all(image_path, dataset_dir, output_dir, results)
+    saved_paths = saver.save_all(image_path, output_dir, results)
     
     print(f"\n✅ Augmentations saved:")
     for path in saved_paths:
