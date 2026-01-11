@@ -151,7 +151,6 @@ class AugmentationSaver:
     def save_all(
             self,
             image_path: Path,
-            dataset_dir: Path,
             output_dir: Path,
             results: Dict[str, np.ndarray]
     ) -> List[Path]:
@@ -160,7 +159,6 @@ class AugmentationSaver:
 
         Args:
             image_path: Path to the original image
-            dataset_dir: Root directory of the original dataset
             output_dir: Root directory where augmented images are saved.
             results: Mapping of augmentation names to transformed images.
 
@@ -175,7 +173,7 @@ class AugmentationSaver:
             augm_path = self.path_manager.make_suffixed_path(
                 self.path_manager.mirror_path(
                     image_path,
-                    dataset_dir,
+                    image_path.parent,
                     output_dir
                 ),
                 f"_{transformation}",
