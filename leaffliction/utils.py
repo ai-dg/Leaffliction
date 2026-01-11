@@ -50,11 +50,16 @@ class PathManager:
         new_path = image_path.with_name(new_name)
         return new_path
 
-    def mirror_path(self, src_path: Path, src_root: Path, target_root: Path) -> Path:
+    def mirror_path(
+            self,
+            src_path: Path,
+            src_root: Path,
+            target_root: Path
+            ) -> Path:
         """
         Given a source file, a source root, and a target root, returns the
         mirror path of the source file respect to the target root.
-        
+
         Args:
             src_path: Path to the source file to mirror
             src_root: Path to the root directory of the source file
@@ -63,9 +68,6 @@ class PathManager:
         Returns:
             The path to the mirrored source file.
         """
-        # print(src_path)
-        # print(src_root)
-        # print(target_root)
         relative = src_path.resolve().relative_to(src_root.resolve())
         return target_root / relative
 
