@@ -70,12 +70,12 @@ class AugmentationEngine:
             }
 
     def augment_dataset(
-        self,
-        train_items: List[Tuple[Path, int]],
-        seed: int,
-        dataset_dir: Path,
-        output_dir: Path,
-    ) -> List[Tuple[Path, int]]:
+            self,
+            train_items: List[Tuple[Path, int]],
+            seed: int,
+            dataset_dir: Path,
+            output_dir: Path,
+            ) -> List[Tuple[Path, int]]:
         """
         Augment the training dataset to balance class distributions.
 
@@ -109,6 +109,7 @@ class AugmentationEngine:
             current_count = len(items)
             deficit = target_count - current_count
 
+            total_nb_pass = target_count // (current_count * nb_augs) + 1
             # Use a round-robin strategy to cycle through augmentations
             # and source images evenly when generating new samples.
             for gen_img_count in range(deficit):
@@ -120,10 +121,15 @@ class AugmentationEngine:
                 result = self.augs[augm_name](image=image)
                 transformed_image = result['image']
 
-                img_transform_id = (gen_img_count // nb_augs) % current_count
+                pass_id = (gen_img_count // nb_augs) // current_count
+                suffix = (
+                    f"_{augm_name}{pass_id}"
+                    if total_nb_pass > 1
+                    else f"_{augm_name}"
+                )
                 augm_path = pm.make_suffixed_path(
                     pm.mirror_path(item[0], dataset_dir, output_dir),
-                    f"_{augm_name}{img_transform_id}"
+                    suffix
                 )
                 pm.ensure_dir(augm_path.parent)
                 cv2.imwrite(str(augm_path), transformed_image)
@@ -153,7 +159,7 @@ class AugmentationSaver:
             image_path: Path,
             output_dir: Path,
             results: Dict[str, np.ndarray]
-    ) -> List[Path]:
+            ) -> List[Path]:
         """
         Saves all augmented versions of an image to disk.
 
@@ -171,11 +177,7 @@ class AugmentationSaver:
             transformed_image = results[transformation]
 
             augm_path = self.path_manager.make_suffixed_path(
-                self.path_manager.mirror_path(
-                    image_path,
-                    image_path.parent,
-                    output_dir
-                ),
+                output_dir / image_path.name,
                 f"_{transformation}",
             )
             self.path_manager.ensure_dir(augm_path.parent)
