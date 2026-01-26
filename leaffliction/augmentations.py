@@ -8,6 +8,9 @@ import albumentations as A
 from leaffliction.utils import PathManager
 from random import Random
 from collections import defaultdict
+import torch
+import torch.nn as nn
+from torch.utils.data import TensorDataset, DataLoader
 
 
 class AugmentationEngine:
@@ -139,6 +142,54 @@ class AugmentationEngine:
         rdm = Random(seed)
         rdm.shuffle(train_items)
         return train_items
+    
+    def load_augmented_items(
+            self,
+            items: List[Tuple[Path, int]],
+            img_size: Tuple[int, int] = (224, 224)
+        ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Charge simplement les images (augmentées ou non) depuis le disque
+        et retourne X, y pour PyTorch, sans transformation.
+
+        Args:
+            items: [(image_path, class_id), ...]
+            img_size: taille de redimensionnement
+
+        Returns:
+            X: torch.Tensor (N, 3, H, W)
+            y: torch.Tensor (N,)
+        """
+        X_list = []
+        y_list = []
+
+        for img_path, label in items:
+            img = cv2.imread(str(img_path))
+            if img is None:
+                print(f"⚠️  Could not load image: {img_path}")
+                continue
+
+            # BGR → RGB
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+            # Resize
+            img = cv2.resize(img, img_size)
+
+            # HWC → CHW
+            img = img.astype(np.float32) / 255.0
+            img = np.transpose(img, (2, 0, 1))
+
+            X_list.append(img)
+            y_list.append(label)
+
+        if not X_list:
+            raise ValueError("No images could be loaded from augmented items.")
+
+        X = torch.from_numpy(np.stack(X_list, axis=0))   # (N, 3, H, W)
+        y = torch.tensor(y_list, dtype=torch.long)
+
+        return X, y
+
 
 
 class AugmentationSaver:

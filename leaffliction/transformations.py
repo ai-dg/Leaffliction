@@ -366,6 +366,8 @@ class TransformationEngine:
             if img is None:
                 print(f"⚠️  Warning: Could not load {img_path}")
                 continue
+            else:
+                print(f"Processing: {img_path}")
 
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             img = cv2.resize(img, img_size)

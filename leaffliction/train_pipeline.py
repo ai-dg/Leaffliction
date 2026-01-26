@@ -93,22 +93,28 @@ class PyTorchTrainer:
             aug_dir = out_dir / "augmented"
             train_items = self.augmentation_engine.augment_dataset(
                 train_items,
-                aug_dir,
-                cfg.augmentations_per_image
+                cfg.augmentations_per_image,
+                dataset_dir=dataset_dir,
+                output_dir=aug_dir,
             )
             print(f"   Created {len(train_items)} total images (original + augmented)")
             print()
+            
+        X_train, y_train = self.augmentation_engine.load_augmented_items(train_items)
+        X_valid, y_valid = self.augmentation_engine.load_augmented_items(valid_items)
+            
+
         
-        # 5. Transformer en tensors PyTorch
-        print("🔍 Transforming images to tensors...")
-        print("   Train tensors...")
-        X_train, y_train = self.transformation_engine.batch_transform(train_items, cfg.img_size)
-        print(f"   Train tensors: {X_train.shape}")
+        # # 5. Transformer en tensors PyTorch
+        # print("🔍 Transforming images to tensors...")
+        # print("   Train tensors...")
+        # X_train, y_train = self.transformation_engine.batch_transform(train_items, cfg.img_size)
+        # print(f"   Train tensors: {X_train.shape}")
         
-        print("   Valid tensors...")
-        X_valid, y_valid = self.transformation_engine.batch_transform(valid_items, cfg.img_size)
-        print(f"   Valid tensors: {X_valid.shape}")
-        print()
+        # print("   Valid tensors...")
+        # X_valid, y_valid = self.transformation_engine.batch_transform(valid_items, cfg.img_size)
+        # print(f"   Valid tensors: {X_valid.shape}")
+        # print()
         
         # 6. Créer DataLoaders
         print("📦 Creating DataLoaders...")
