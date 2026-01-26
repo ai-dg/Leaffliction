@@ -7,6 +7,7 @@ import matplotlib
 plt.style.use("./style/leaffliction.mplstyle")
 import numpy as np
 from math import ceil
+import cv2
 
 
 
@@ -96,6 +97,26 @@ class GridPlotter:
     Affiche une grille (original + variantes).
     Pratique pour Augmentation et Transformation.
     """
+    def _imshow_safe(self, img: np.ndarray) -> None:
+        # Grayscale / mask
+        if img.ndim == 2:
+            plt.imshow(img, cmap="gray", vmin=0, vmax=255)
+            return
+
+        # BGRA -> RGBA
+        if img.ndim == 3 and img.shape[2] == 4:
+            img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA)
+            plt.imshow(img)
+            return
+
+        # BGR -> RGB
+        if img.ndim == 3 and img.shape[2] == 3:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            plt.imshow(img)
+            return
+
+        # fallback
+        plt.imshow(img)
 
     def show_grid(
         self,
@@ -119,14 +140,14 @@ class GridPlotter:
         if original is not None:
             plt.subplot(rows, max_cols, plot_idx)
             plt.axis('off')
-            plt.imshow(original)
+            self._imshow_safe(original)
             plt.title("Original")
             plot_idx += 1
 
         for transformation, img in images.items():
             plt.subplot(rows, max_cols, plot_idx)
             plt.axis('off')
-            plt.imshow(img)
+            self._imshow_safe(img)
             plt.title(transformation)
             plot_idx += 1
 

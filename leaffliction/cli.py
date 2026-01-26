@@ -122,7 +122,7 @@ class CLIBuilder:
         )
 
         parser.add_argument(
-            "img_path",
+            "image_path",
             nargs="?",
             type=str,
             help="Path to an input image (e.g., ./Apple/apple_healthy/image (1).JPG)"

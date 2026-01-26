@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import cv2
+from plantcv import plantcv as pcv
 import numpy as np
 
 from leaffliction.cli import CLIBuilder
@@ -37,10 +38,11 @@ def main() -> None:
         return
     
     # Convertir BGR → RGB pour affichage correct
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
     # Appliquer toutes les transformations
     results = engine.apply_all(img)
+    # pcv.plot_image(results['GaussianMask'])
 
     # Afficher la grille (original + 6 transformations)
     grid.show_grid("Transformations", results, original=img)
