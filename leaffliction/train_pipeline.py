@@ -7,6 +7,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 
+from Transformation import BatchTransformer
+
 
 @dataclass
 class TrainConfig:
@@ -18,6 +20,7 @@ class TrainConfig:
     seed: int = 42
     img_size: Tuple[int, int] = (224, 224)
     augment_train: bool = True
+    transform_train: bool = True
     augmentations_per_image: int = 3
     extra: Dict[str, Any] = field(default_factory=dict)
 
@@ -99,22 +102,28 @@ class PyTorchTrainer:
             )
             print(f"   Created {len(train_items)} total images (original + augmented)")
             print()
+
+        if cfg.transform_train:
+            transform_dir = out_dir / "transform"
+            batch_engine = BatchTransformer(self.transformation_engine)
+            transform_items = batch_engine.run(dataset_dir, transform_dir)
+            train_items.extend(transform_items)
             
         X_train, y_train = self.augmentation_engine.load_augmented_items(train_items)
         X_valid, y_valid = self.augmentation_engine.load_augmented_items(valid_items)
             
 
         
-        # # 5. Transformer en tensors PyTorch
-        # print("🔍 Transforming images to tensors...")
-        # print("   Train tensors...")
-        # X_train, y_train = self.transformation_engine.batch_transform(train_items, cfg.img_size)
-        # print(f"   Train tensors: {X_train.shape}")
+        # 5. Transformer en tensors PyTorch
+        print("🔍 Transforming images to tensors...")
+        print("   Train tensors...")
+        X_train, y_train = self.transformation_engine.batch_transform(train_items, cfg.img_size)
+        print(f"   Train tensors: {X_train.shape}")
         
-        # print("   Valid tensors...")
-        # X_valid, y_valid = self.transformation_engine.batch_transform(valid_items, cfg.img_size)
-        # print(f"   Valid tensors: {X_valid.shape}")
-        # print()
+        print("   Valid tensors...")
+        X_valid, y_valid = self.transformation_engine.batch_transform(valid_items, cfg.img_size)
+        print(f"   Valid tensors: {X_valid.shape}")
+        print()
         
         # 6. Créer DataLoaders
         print("📦 Creating DataLoaders...")
@@ -303,7 +312,7 @@ class TrainingPackager:
         Crée le fichier learnings.zip depuis artifacts_dir.
         """
         print("📦 Creating learnings.zip...")
-        self.zip_packager.ft_zip_dir(artifacts_dir, out_zip)
+        self.zip_packager.zip_dir(artifacts_dir, out_zip)
         print(f"   ZIP created: {out_zip}")
 
 
@@ -325,7 +334,7 @@ class RequirementsGate:
         if metrics.valid_accuracy < 0.90:
             raise ValueError(
                 f"❌ Validation accuracy {metrics.valid_accuracy:.2%} < 90%. "
-                f"Training failed to meet requirements."
+                f"TraiZipPackagerning failed to meet requirements."
             )
         print(f"   ✓ Validation accuracy: {metrics.valid_accuracy:.2%} >= 90%")
         

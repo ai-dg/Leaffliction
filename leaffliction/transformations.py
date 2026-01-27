@@ -11,6 +11,7 @@ import torch
 from plantcv import plantcv as pcv
 import rembg
 import matplotlib.pyplot as plt
+from leaffliction.utils import PathManager
 
 
 def _ensure_uint8(img: np.ndarray) -> np.ndarray:
@@ -379,17 +380,25 @@ class TransformationEngine:
         X = torch.stack(X_list)
         y = torch.tensor(y_list, dtype=torch.long)
         return X, y
+    
 
 
 class BatchTransformer:
-    def __init__(self, engine: TransformationEngine, path_manager: PathManager) -> None:
+    def __init__(self, engine: TransformationEngine) -> None:
         self.engine = engine
-        self.pm = path_manager
+        self.pm = PathManager()
 
-    def run(self, src: Path, dst: Path, recursive: bool = True) -> None:
+    def run(
+        self,
+        src: Path,
+        dst: Path,
+        recursive: bool = True
+    ) -> List[Tuple[Path, int]]:
+
         self.pm.ensure_dir(dst)
+        generated_items: List[Tuple[Path, int]] = []
 
-        # 1) liste images
+        # 1) list images
         if src.is_file():
             paths = [src]
         else:
@@ -401,6 +410,14 @@ class BatchTransformer:
                 print(f"⚠️  Could not load {p}")
                 continue
 
+            # 👉 class_id depuis le dossier parent
+            # ex: dataset/train/rust/img1.png → class_id = rust
+            try:
+                class_id = int(p.parent.name)
+            except ValueError:
+                # si tu utilises des labels string
+                class_id = p.parent.name  # type: ignore
+
             img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             results = self.engine.apply_all(img_rgb)
 
@@ -410,26 +427,29 @@ class BatchTransformer:
                 else (dst / p.name)
             )
             out_dir = self.pm.ensure_dir(mirrored_file.parent)
-
             stem = p.stem
 
+            # ---------- original ----------
             orig_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
             orig_path = out_dir / f"{stem}_original.png"
             cv2.imwrite(str(orig_path), _ensure_uint8(orig_bgr))
+            generated_items.append((orig_path, class_id))
 
+            # ---------- augmented ----------
             for name, out_img in results.items():
-                out = out_img
-
-                if out.ndim == 3 and out.shape[2] == 3:
-                    out_bgr = cv2.cvtColor(out, cv2.COLOR_RGB2BGR)
-                elif out.ndim == 3 and out.shape[2] == 4:
-                    out_bgr = out
+                if out_img.ndim == 3 and out_img.shape[2] == 3:
+                    out_bgr = cv2.cvtColor(out_img, cv2.COLOR_RGB2BGR)
                 else:
-                    out_bgr = out
+                    out_bgr = out_img
 
                 out_path = out_dir / f"{stem}_{name}.png"
+                if out_path.exists():
+                    print(f"⏭️  Skipped existing file: {out_path}")
+                    continue
                 cv2.imwrite(str(out_path), _ensure_uint8(out_bgr))
+                generated_items.append((out_path, class_id))
 
+        return generated_items
 
 
 

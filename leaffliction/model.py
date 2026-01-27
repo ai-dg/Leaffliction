@@ -278,7 +278,16 @@ class PyTorchModelBundle:
         self.model.eval()
 
         if tensor.dim() == 3:
-            tensor = tensor.unsqueeze(0)
+            tensor = tensor.unsqueeze(0)  # [1,C,H,W]
+
+        # Force RGB
+        if tensor.size(1) != 3:
+            if tensor.size(1) > 3:
+                tensor = tensor[:, :3, :, :]          # drop extra channels
+            elif tensor.size(1) == 1:
+                tensor = tensor.repeat(1, 3, 1, 1)    # grayscale -> RGB
+            else:
+                raise ValueError(f"Unexpected channel count: {tensor.size(1)}")
 
         tensor = tensor.to(self.device)
 
