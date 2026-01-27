@@ -12,6 +12,8 @@ from plantcv import plantcv as pcv
 import rembg
 import matplotlib.pyplot as plt
 from leaffliction.utils import PathManager
+from collections import defaultdict
+from random import Random
 
 
 def _ensure_uint8(img: np.ndarray) -> np.ndarray:
@@ -381,12 +383,104 @@ class TransformationEngine:
         y = torch.tensor(y_list, dtype=torch.long)
         return X, y
     
+    def load_transformer_items(
+        self,
+        items: List[Tuple[Path, int]],
+        img_size: Tuple[int, int] = (224, 224),
+        capacity: float = 1.0,
+        seed: int = 42
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
 
+        if not (0 < capacity <= 1.0):
+            raise ValueError("capacity must be in (0, 1]")
+
+        # ---------- 1) Stratified subsampling ----------
+        if capacity < 1.0:
+            rdm = Random(seed)
+
+            items_by_class = defaultdict(list)
+            for path, label in items:
+                items_by_class[label].append((path, label))
+
+            limited_items: List[Tuple[Path, int]] = []
+
+            print(f"📉 Applying capacity limit: {int(capacity * 100)}%")
+
+            for label, class_items in items_by_class.items():
+                n_total = len(class_items)
+                n_keep = max(1, int(n_total * capacity))
+
+                rdm.shuffle(class_items)
+                kept = class_items[:n_keep]
+
+                limited_items.extend(kept)
+
+                print(
+                    f"  class {label}: "
+                    f"{n_keep}/{n_total} images kept"
+                )
+
+            items = limited_items
+            rdm.shuffle(items)
+
+            print(f"📦 Total images after limit: {len(items)}")
+
+        # ---------- 2) Load images ----------
+        X_list = []
+        y_list = []
+
+        for idx, (img_path, label) in enumerate(items, start=1):
+            img = cv2.imread(str(img_path))
+            if img is None:
+                print(f"⚠️  Could not load image: {img_path}")
+                continue
+
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img = cv2.resize(img, img_size)
+
+            img = img.astype(np.float32) / 255.0
+            img = np.transpose(img, (2, 0, 1))
+
+            X_list.append(img)
+            y_list.append(label)
+
+            if idx % 500 == 0:
+                print(f"  Loaded {idx}/{len(items)} images")
+
+        if not X_list:
+            raise ValueError("No images could be loaded from augmented items.")
+
+        X = torch.from_numpy(np.stack(X_list, axis=0))
+        y = torch.tensor(y_list, dtype=torch.long)
+
+        return X, y
+    
 
 class BatchTransformer:
     def __init__(self, engine: TransformationEngine) -> None:
         self.engine = engine
         self.pm = PathManager()
+
+    def _build_label_map(self, src: Path, recursive: bool) -> Dict[str, int]:
+        print(f"\n🔎 Building label → id map (recursive={recursive})")
+
+        if src.is_file():
+            label = src.parent.name
+            print(f"  • Single file mode → label '{label}' → id 0")
+            return {label: 0}
+
+        labels = set()
+        for p in self.pm.iter_images(src, recursive=recursive):
+            labels.add(p.parent.name)
+
+        sorted_labels = sorted(labels)
+        label_to_id = {label: i for i, label in enumerate(sorted_labels)}
+
+        print("  ✔ Labels found:")
+        for label, idx in label_to_id.items():
+            print(f"    - {label} → {idx}")
+
+        return label_to_id
 
     def run(
         self,
@@ -395,32 +489,43 @@ class BatchTransformer:
         recursive: bool = True
     ) -> List[Tuple[Path, int]]:
 
+        print(f"\n🚀 BatchTransformer.run")
+        print(f"  src = {src}")
+        print(f"  dst = {dst}")
+        print(f"  recursive = {recursive}")
+
         self.pm.ensure_dir(dst)
-        generated_items: List[Tuple[Path, int]] = []
+        items: List[Tuple[Path, int]] = []
 
         # 1) list images
         if src.is_file():
             paths = [src]
+            print("📄 Source is a single file")
         else:
-            paths = self.pm.iter_images(src, recursive=recursive)
+            paths = list(self.pm.iter_images(src, recursive=recursive))
+            print(f"📁 Found {len(paths)} images under {src}")
 
-        for p in paths:
-            img = cv2.imread(str(p))
-            if img is None:
-                print(f"⚠️  Could not load {p}")
+        # 2) label -> id mapping
+        label_to_id = self._build_label_map(src, recursive=recursive)
+
+        # 3) transformation names
+        tf_names = [tf.name for tf in self.engine.tfs]
+        print(f"\n🧪 Transformations ({len(tf_names)}): {tf_names}")
+
+        # 4) iterate images
+        for idx, p in enumerate(paths, start=1):
+            print(f"\n➡️  [{idx}/{len(paths)}] Processing image:")
+            print(f"    path = {p}")
+
+            label = p.parent.name
+            if label not in label_to_id:
+                print(f"    ⚠️  Unknown label '{label}', skipping")
                 continue
 
-            # 👉 class_id depuis le dossier parent
-            # ex: dataset/train/rust/img1.png → class_id = rust
-            try:
-                class_id = int(p.parent.name)
-            except ValueError:
-                # si tu utilises des labels string
-                class_id = p.parent.name  # type: ignore
+            class_id = label_to_id[label]
+            print(f"    label = '{label}' → class_id = {class_id}")
 
-            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            results = self.engine.apply_all(img_rgb)
-
+            # output directory mirroring
             mirrored_file = (
                 self.pm.mirror_path(p, src_root=src, target_root=dst)
                 if src.is_dir()
@@ -429,27 +534,68 @@ class BatchTransformer:
             out_dir = self.pm.ensure_dir(mirrored_file.parent)
             stem = p.stem
 
-            # ---------- original ----------
-            orig_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
-            orig_path = out_dir / f"{stem}_original.png"
-            cv2.imwrite(str(orig_path), _ensure_uint8(orig_bgr))
-            generated_items.append((orig_path, class_id))
+            print(f"    output dir = {out_dir}")
+            print(f"    stem = {stem}")
 
-            # ---------- augmented ----------
-            for name, out_img in results.items():
+            # 5) check missing outputs (NO ORIGINAL)
+            missing_tf_names = [
+                name for name in tf_names
+                if not (out_dir / f"{stem}_{name}.png").exists()
+            ]
+
+            if missing_tf_names:
+                print(f"    missing transforms = {missing_tf_names}")
+            else:
+                print(f"    ✅ all transforms already exist (nothing to do)")
+
+                # On retourne quand même les paths existants des transforms
+                for name in tf_names:
+                    items.append((out_dir / f"{stem}_{name}.png", class_id))
+                continue
+
+            # 6) load image only if needed
+            print("    📥 Loading image")
+            img = cv2.imread(str(p))
+            if img is None:
+                print(f"    ❌ Could not load image, skipping")
+                continue
+
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+            # 7) compute ONLY missing transforms, keep ctx/cache consistent
+            print("    🔄 Applying transformations")
+            ctx = TFContext(img=_ensure_uint8(img_rgb), cache={})
+
+            for tf in self.engine.tfs:
+                out_img = tf.apply(ctx)
+
+                if tf.name not in missing_tf_names:
+                    print(f"      ⏭️  {tf.name} (already exists)")
+                    continue
+
+                out_path = out_dir / f"{stem}_{tf.name}.png"
+                if out_path.exists():
+                    print(f"      ⏭️  {tf.name} appeared meanwhile, skip")
+                    continue
+
+                print(f"      ✨ Writing {tf.name} → {out_path.name}")
+
                 if out_img.ndim == 3 and out_img.shape[2] == 3:
                     out_bgr = cv2.cvtColor(out_img, cv2.COLOR_RGB2BGR)
                 else:
                     out_bgr = out_img
 
-                out_path = out_dir / f"{stem}_{name}.png"
-                if out_path.exists():
-                    print(f"⏭️  Skipped existing file: {out_path}")
-                    continue
                 cv2.imwrite(str(out_path), _ensure_uint8(out_bgr))
-                generated_items.append((out_path, class_id))
 
-        return generated_items
+            # 8) register all transform outputs (existing + newly created)
+            for name in tf_names:
+                items.append((out_dir / f"{stem}_{name}.png", class_id))
+
+        print(f"\n✅ BatchTransformer finished")
+        print(f"📦 Total transformed items returned: {len(items)}")
+
+        return items
+
 
 
 

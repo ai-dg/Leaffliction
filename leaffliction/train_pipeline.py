@@ -108,22 +108,23 @@ class PyTorchTrainer:
             batch_engine = BatchTransformer(self.transformation_engine)
             transform_items = batch_engine.run(dataset_dir, transform_dir)
             train_items.extend(transform_items)
+                
             
-        X_train, y_train = self.augmentation_engine.load_augmented_items(train_items)
-        X_valid, y_valid = self.augmentation_engine.load_augmented_items(valid_items)
+        X_train, y_train = self.transformation_engine.load_transformer_items(train_items, capacity=0.2)
+        X_valid, y_valid = self.transformation_engine.load_transformer_items(valid_items)
             
 
         
-        # 5. Transformer en tensors PyTorch
-        print("🔍 Transforming images to tensors...")
-        print("   Train tensors...")
-        X_train, y_train = self.transformation_engine.batch_transform(train_items, cfg.img_size)
-        print(f"   Train tensors: {X_train.shape}")
+        # # 5. Transformer en tensors PyTorch
+        # print("🔍 Transforming images to tensors...")
+        # print("   Train tensors...")
+        # X_train, y_train = self.transformation_engine.batch_transform(train_items, cfg.img_size)
+        # print(f"   Train tensors: {X_train.shape}")
         
-        print("   Valid tensors...")
-        X_valid, y_valid = self.transformation_engine.batch_transform(valid_items, cfg.img_size)
-        print(f"   Valid tensors: {X_valid.shape}")
-        print()
+        # print("   Valid tensors...")
+        # X_valid, y_valid = self.transformation_engine.batch_transform(valid_items, cfg.img_size)
+        # print(f"   Valid tensors: {X_valid.shape}")
+        # print()
         
         # 6. Créer DataLoaders
         print("📦 Creating DataLoaders...")
@@ -296,24 +297,29 @@ class TrainingPackager:
         Prépare le dossier d'artefacts à zipper.
         Pour PyTorch: model/
         """
+        import shutil
+
         artifacts_dir = tmp_dir / "artifacts"
         artifacts_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Copier le dossier model/
         model_dir = tmp_dir / "model"
+        dst_model_dir = artifacts_dir / "model"
+
         if model_dir.exists():
-            import shutil
-            shutil.copytree(model_dir, artifacts_dir / "model")
-        
+            # 🔥 Si destination existe, on la supprime pour éviter FileExistsError
+            if dst_model_dir.exists():
+                shutil.rmtree(dst_model_dir)
+
+            shutil.copytree(model_dir, dst_model_dir)
+
         return artifacts_dir
 
     def build_zip(self, artifacts_dir: Path, out_zip: Path) -> None:
-        """
-        Crée le fichier learnings.zip depuis artifacts_dir.
-        """
         print("📦 Creating learnings.zip...")
         self.zip_packager.zip_dir(artifacts_dir, out_zip)
         print(f"   ZIP created: {out_zip}")
+
 
 
 class RequirementsGate:
