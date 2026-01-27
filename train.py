@@ -76,7 +76,7 @@ def main() -> None:
     # Signature SHA1
     print("🔐 Generating signature...")
     hasher = Hasher()
-    signature = hasher.ft_sha1_file(out_zip)
+    signature = hasher.sha1_file(out_zip)
     signature_file = Path("signature.txt")
     signature_file.write_text(signature + "\n")
     print(f"   Signature saved to {signature_file}")

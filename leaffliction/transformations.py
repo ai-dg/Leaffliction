@@ -597,8 +597,6 @@ class BatchTransformer:
         return items
 
 
-
-
 def main():
     [...]
 

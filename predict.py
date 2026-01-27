@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from os import path
 from pathlib import Path
 import cv2
 import torch
+import sys
 
 from leaffliction.cli import CLIBuilder
 from leaffliction.predict_pipeline import PyTorchPredictor, PredictConfig
@@ -14,8 +16,44 @@ def main() -> None:
     parser = CLIBuilder().build_predict_parser()
     args = parser.parse_args()
 
-    bundle_zip = Path(args.bundle_zip)
-    image_path = Path(args.image_path)
+    bundle_zip: Path | None = args.bundle_zip
+    model_path: Path | None = args.model_path
+    image_path: Path = args.image_path  # required=True
+
+    # ❌ Aucun modèle fourni
+    if bundle_zip is None and model_path is None:
+        print("Error: you must provide either --bundle-zip or --model-path")
+        sys.exit(1)
+
+    # ❌ Les deux à la fois
+    if bundle_zip is not None and model_path is not None:
+        print("Error: choose ONE method between --bundle-zip OR --model-path")
+        sys.exit(1)
+
+    # ❌ Chemins invalides
+    if bundle_zip is not None and not bundle_zip.exists():
+        print(f"Error: bundle zip not found: {bundle_zip}")
+        sys.exit(1)
+
+    if model_path is not None and not model_path.exists():
+        print(f"Error: model path not found: {model_path}")
+        sys.exit(1)
+
+    if not image_path.exists():
+        print(f"Error: image not found: {image_path}")
+        sys.exit(1)
+
+    print("✅ CLI arguments OK")
+    print(f"  image_path = {image_path}")
+    if bundle_zip:
+        print(f"  bundle_zip = {bundle_zip}")
+    else:
+        print(f"  model_path = {model_path}")
+
+
+
+
+    
 
     cfg = PredictConfig(
         show_transforms=getattr(args, "show_transforms", True),
@@ -42,6 +80,7 @@ def main() -> None:
     # Prédiction
     predicted_label, probs, transformed = predictor.predict(
         bundle_zip=bundle_zip,
+        model_path=model_path,
         image_path=image_path,
         cfg=cfg
     )

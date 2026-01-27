@@ -6,7 +6,9 @@ from typing import Any, Dict, Tuple
 import numpy as np
 import cv2
 import torch
+import sys
 import tempfile
+from leaffliction.model import PyTorchModelBundle
 
 
 @dataclass
@@ -21,14 +23,15 @@ class PyTorchPredictor:
     Charge un PyTorchModelBundle puis prédit sur une image.
     """
 
-    def __init__(self, bundle_loader: Any, transformation_engine: Any) -> None:
+    def __init__(self, bundle_loader: PyTorchModelBundle, transformation_engine: Any) -> None:
         self.bundle_loader = bundle_loader
         self.transformation_engine = transformation_engine
 
     def predict(
         self, 
         bundle_zip: Path, 
-        image_path: Path, 
+        image_path: Path,
+        model_path: Path, 
         cfg: PredictConfig
     ) -> Tuple[str, Dict[str, float], Dict[str, np.ndarray]]:
         """
@@ -44,12 +47,37 @@ class PyTorchPredictor:
           - probs: Dict[str, float] (probabilités par classe)
           - transformed: Dict[str, np.ndarray] (transformations pour visualisation)
         """
-        # 1. Charger le bundle
-        print("📦 Loading model bundle...")
-        with tempfile.TemporaryDirectory() as temp_dir:
-            bundle = self.bundle_loader.load_from_zip(bundle_zip, Path(temp_dir))
-        print("   Model loaded successfully")
-        print()
+
+        
+        print(f"bundle_zip={bundle_zip}")
+        print(f"model_path={model_path}")
+
+        # 1) validation
+        if bundle_zip is None and model_path is None:
+            raise ValueError("You must provide either bundle_zip or model_path")
+
+        if bundle_zip is not None and model_path is not None:
+            raise ValueError("Choose ONE: bundle_zip OR model_path (not both)")
+
+        # 2) load
+        if bundle_zip is not None:
+            if not bundle_zip.exists():
+                raise FileNotFoundError(f"Bundle zip not found: {bundle_zip}")
+
+            print("📦 Loading model bundle from zip...")
+            with tempfile.TemporaryDirectory() as temp_dir:
+                bundle = self.bundle_loader.load_from_zip(bundle_zip, Path(temp_dir))
+            print("   Model loaded successfully")
+            print()
+
+        else:  # model_path is not None
+            if not model_path.exists():
+                raise FileNotFoundError(f"Model path not found: {model_path}")
+
+            print("📦 Loading model bundle from directory...")
+            bundle = self.bundle_loader.load(model_path)
+            print("   Model loaded successfully")
+            print()
         
         # 2. Charger et transformer l'image
         print("🔍 Processing image...")

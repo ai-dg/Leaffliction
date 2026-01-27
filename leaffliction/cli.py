@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 
 class CLIBuilder:
@@ -301,20 +302,20 @@ class CLIBuilder:
 
         parser.add_argument(
             "image_path",
-            type=str,
+            type=Path,
             help="Path to an input image to classify (e.g., ./Apple/apple_healthy/image (1).JPG)"
         )
 
         parser.add_argument(
             "--bundle-zip",
-            type=str,
+            type=Path,
             default=None,
             help="Path to the training bundle zip produced by train (optional)."
         )
 
         parser.add_argument(
             "--model-path",
-            type=str,
+            type=Path,
             default=None,
             help="Path to the model/artifacts directory (optional; overrides --bundle-zip if provided)."
         )
