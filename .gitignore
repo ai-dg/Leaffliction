@@ -7,12 +7,13 @@ __pycache__/
 venv/
 env/
 
-# Training outputs / artifacts
+# Training outputs / ML artifacts
 training_artifacts/
 training_artifacts.zip
+*.zip
 leaves/
 
-# OS / editors (optionnel mais recommandé)
+# OS / editors
 .DS_Store
 .idea/
 .vscode/
