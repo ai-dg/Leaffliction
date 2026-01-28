@@ -96,7 +96,7 @@ class PyTorchTrainer:
             aug_dir = out_dir / "augmented"
             train_items = self.augmentation_engine.augment_dataset(
                 train_items,
-                cfg.augmentations_per_image,
+                cfg.seed,
                 dataset_dir=dataset_dir,
                 output_dir=aug_dir,
             )

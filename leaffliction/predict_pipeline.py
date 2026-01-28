@@ -92,6 +92,11 @@ class PyTorchPredictor:
         tensor = self.transformation_engine.apply_all_as_tensor(img_resized)
         print(f"   Tensor shape: {tensor.shape}")
         print()
+
+        print("🧾 Labels mapping (id -> label):")
+        print(bundle.labels.class_to_id)
+        print(bundle.labels.id_to_class)
+
         
         # 3. Prédire
         print("🎯 Predicting...")
@@ -99,6 +104,8 @@ class PyTorchPredictor:
         predicted_label = bundle.labels.decode(pred_id)
         print(f"   Predicted: {predicted_label}")
         print()
+
+        
         
         # 4. (Optionnel) Appliquer transformations pour visualisation
         transformed = {}
