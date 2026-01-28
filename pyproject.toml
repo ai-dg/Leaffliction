@@ -3,14 +3,16 @@ name = "leaffliction"
 version = "0.1.0"
 description = "Image classification by disease recognition on leaves"
 readme = "README.md"
-requires-python = ">=3.11,<3.12"
+requires-python = ">=3.10,<3.11"
 dependencies = [
     "albumentationsx>=2.0.13",
     "flake8>=7.3.0",
-    "matplotlib>=3.10.8",
-    "numpy>=2.4.0",
-    "opencv-python>=4.11.0.86",
-    "plantcv>=4.10",
-    "torch>=2.9.1",
-    "torchvision>=0.24.1",
+    "matplotlib>=3.9.0,<3.10",
+    "numpy>=1.26.0,<2.0",
+    "onnxruntime>=1.15.0",
+    "opencv-python>=4.10.0",
+    "plantcv>=4.0,<4.10",
+    "rembg>=2.0.0",
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
 ]
