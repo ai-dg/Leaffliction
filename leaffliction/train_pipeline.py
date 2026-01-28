@@ -8,7 +8,7 @@ import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 
 from Transformation import BatchTransformer
-
+import sys
 
 @dataclass
 class TrainConfig:
@@ -55,30 +55,13 @@ class PyTorchTrainer:
         self.labels = labels
 
     def train(self, dataset_dir: Path, out_dir: Path, cfg: TrainConfig) -> Metrics:
-        """
-        Pipeline complet PyTorch:
-        1. Scanner le dataset
-        2. Split train/valid (stratifié)
-        3. (Optionnel) Augmenter le train set (images physiques)
-        4. Transformer en tensors PyTorch (train + valid)
-        5. Créer DataLoaders
-        6. Construire le modèle PyTorch
-        7. Entraîner avec backpropagation
-        8. Évaluer accuracy
-        9. Sauvegarder bundle (model.pth, labels.json)
-        
-        Retourne: Metrics avec train_accuracy, valid_accuracy, valid_count
-        """
-        # 1. Scanner dataset
         print("📂 Scanning dataset...")
         index = self.dataset_scanner.scan(dataset_dir)
         print(f"   Found {index.num_classes} classes, {index.size} images")
         print()
         
-        # 2. Fitter le LabelEncoder
         self.labels.fit(index.class_names)
         
-        # 3. Split train/valid
         print("✂️  Splitting dataset...")
         train_items, valid_items = self.dataset_splitter.split(
             index.items,
@@ -89,8 +72,13 @@ class PyTorchTrainer:
         print(f"   Train: {len(train_items)} images")
         print(f"   Valid: {len(valid_items)} images")
         print()
-        
-        # 4. (Optionnel) Augmenter train set
+
+        X_train = None
+        y_train = None
+        X_valid = None
+        y_valid = None
+
+        aug_dir = None
         if cfg.augment_train:
             print("🔄 Augmenting train set...")
             aug_dir = out_dir / "augmented"
@@ -103,30 +91,35 @@ class PyTorchTrainer:
             print(f"   Created {len(train_items)} total images (original + augmented)")
             print()
 
+            # print(train_items)
+            # sys.exit(1)
+            # X_train, y_train = self.augmentation_engine.load_augmented_items(train_items)
+            # X_valid, y_valid = self.augmentation_engine.load_augmented_items(valid_items)
+
         if cfg.transform_train:
             transform_dir = out_dir / "transform"
             batch_engine = BatchTransformer(self.transformation_engine)
-            transform_items = batch_engine.run(dataset_dir, transform_dir)
-            train_items.extend(transform_items)
-                
-            
-        X_train, y_train = self.transformation_engine.load_transformer_items(train_items, capacity=0.2)
-        X_valid, y_valid = self.transformation_engine.load_transformer_items(valid_items)
-            
+            batch_engine.run(dataset_dir, transform_dir)
 
+            if aug_dir:
+                batch_engine.run(aug_dir, transform_dir)
+                # train_items.extend(aug_elements_transformed)
+
+            train_items = self.transformation_engine.extract_transformed_items(train_items, transform_dir)
+            # 3️⃣ Extraire UNIQUEMENT les transforms du valid
+            valid_items = self.transformation_engine.extract_transformed_items(valid_items, transform_dir)
+
+            print(
+                f"Transforms extracted → "
+                f"train: {len(train_items)}, valid: {len(valid_items)}"
+            )
+            
+            X_train, y_train = self.transformation_engine.load_transformer_items(train_items, capacity=0.5)
+            X_valid, y_valid = self.transformation_engine.load_transformer_items(valid_items, capacity=1)
+            
         
-        # # 5. Transformer en tensors PyTorch
-        # print("🔍 Transforming images to tensors...")
-        # print("   Train tensors...")
-        # X_train, y_train = self.transformation_engine.batch_transform(train_items, cfg.img_size)
-        # print(f"   Train tensors: {X_train.shape}")
-        
-        # print("   Valid tensors...")
-        # X_valid, y_valid = self.transformation_engine.batch_transform(valid_items, cfg.img_size)
-        # print(f"   Valid tensors: {X_valid.shape}")
-        # print()
-        
-        # 6. Créer DataLoaders
+
+    
         print("📦 Creating DataLoaders...")
         train_dataset = TensorDataset(X_train, y_train)
         valid_dataset = TensorDataset(X_valid, y_valid)
@@ -144,6 +137,8 @@ class PyTorchTrainer:
         print(f"   Train batches: {len(train_loader)}")
         print(f"   Valid batches: {len(valid_loader)}")
         print()
+
+        print(f"Number of channels: {X_train.shape[1]}")
         
         # 7. Construire modèle
         print("🤖 Building PyTorch model...")

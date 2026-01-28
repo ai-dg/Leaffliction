@@ -106,6 +106,13 @@ class TFContext:
         masked = _ensure_uint8(masked)
         self.set("masked", masked)
 
+        masked_bgr = _ensure_uint8(masked)
+        hsv = cv2.cvtColor(masked_bgr, cv2.COLOR_BGR2HSV)
+        hue = hsv[:, :, 0]
+        hue_255 = (hue.astype(np.float32) * (255.0 / 179.0)).astype(np.uint8)
+        self.set("hue", hue_255)
+
+
     def ensure_roi(self) -> None:
         if self.has("roi_image") and self.has("kept_mask"):
             return
@@ -175,7 +182,7 @@ class NoBg:
 
 @dataclass
 class GrayscaleL:
-    name: str = "LAB_L"
+    name: str = "GrayScale"
 
     def apply(self, ctx: TFContext) -> np.ndarray:
         ctx.ensure_base()
@@ -225,6 +232,13 @@ class Masked:
         ctx.ensure_base(threshold=self.threshold, fill_size=self.fill_size)
         return ctx.get("masked")
 
+@dataclass
+class Hue:
+    name: str = "Hue"
+
+    def apply(self, ctx: TFContext) -> np.ndarray:
+        ctx.ensure_base()
+        return ctx.get("hue")
 
 @dataclass
 class RoiImage:
@@ -311,6 +325,20 @@ class PseudoLandmarks:
         return _ensure_uint8(pseudo_img)
 
 
+def _base_stem_and_tf_name(stem: str, tf_names: List[str]) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Détecte si le fichier correspond à un transform: <base>_<tfname>.png
+    Retourne (base_stem, tf_name) ou (None, None) si non reconnu.
+    """
+    # On matche par suffixe pour éviter les problèmes si le nom contient des underscores
+    for tf in tf_names:
+        suf = "_" + tf
+        if stem.endswith(suf):
+            base = stem[: -len(suf)]
+            return base, tf
+    return None, None
+
+
 class TransformationEngine:
     def __init__(self, tfs: List[Transformation]) -> None:
         self.tfs = tfs
@@ -318,7 +346,8 @@ class TransformationEngine:
     @classmethod
     def default_six(cls) -> "TransformationEngine":
         tfs: List[Transformation] = [
-            # GrayscaleL(),
+            GrayscaleL(),
+            Hue(),
             # Thresh(threshold=35, fill_size=200),
             # Filled(threshold=35, fill_size=200),
             GaussianMask(threshold=120, fill_size=200),
@@ -383,6 +412,77 @@ class TransformationEngine:
         y = torch.tensor(y_list, dtype=torch.long)
         return X, y
     
+    # def load_transformer_items(
+    #     self,
+    #     items: List[Tuple[Path, int]],
+    #     img_size: Tuple[int, int] = (224, 224),
+    #     capacity: float = 1.0,
+    #     seed: int = 42
+    # ) -> Tuple[torch.Tensor, torch.Tensor]:
+
+    #     if not (0 < capacity <= 1.0):
+    #         raise ValueError("capacity must be in (0, 1]")
+
+    #     # ---------- 1) Stratified subsampling ----------
+    #     if capacity < 1.0:
+    #         rdm = Random(seed)
+
+    #         items_by_class = defaultdict(list)
+    #         for path, label in items:
+    #             items_by_class[label].append((path, label))
+
+    #         limited_items: List[Tuple[Path, int]] = []
+
+    #         print(f"📉 Applying capacity limit: {int(capacity * 100)}%")
+
+    #         for label, class_items in items_by_class.items():
+    #             n_total = len(class_items)
+    #             n_keep = max(1, int(n_total * capacity))
+
+    #             rdm.shuffle(class_items)
+    #             kept = class_items[:n_keep]
+
+    #             limited_items.extend(kept)
+
+    #             print(
+    #                 f"  class {label}: "
+    #                 f"{n_keep}/{n_total} images kept"
+    #             )
+
+    #         items = limited_items
+    #         rdm.shuffle(items)
+
+    #         print(f"📦 Total images after limit: {len(items)}")
+
+    #     # ---------- 2) Load images ----------
+    #     X_list = []
+    #     y_list = []
+
+    #     for idx, (img_path, label) in enumerate(items, start=1):
+    #         img = cv2.imread(str(img_path))
+    #         if img is None:
+    #             print(f"⚠️  Could not load image: {img_path}")
+    #             continue
+
+    #         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    #         img = cv2.resize(img, img_size)
+
+    #         img = img.astype(np.float32) / 255.0
+    #         img = np.transpose(img, (2, 0, 1))
+
+    #         X_list.append(img)
+    #         y_list.append(label)
+
+    #         if idx % 500 == 0:
+    #             print(f"  Loaded {idx}/{len(items)} images")
+
+    #     if not X_list:
+    #         raise ValueError("No images could be loaded from augmented items.")
+
+    #     X = torch.from_numpy(np.stack(X_list, axis=0))
+    #     y = torch.tensor(y_list, dtype=torch.long)
+
+    #     return X, y
     def load_transformer_items(
         self,
         items: List[Tuple[Path, int]],
@@ -394,66 +494,164 @@ class TransformationEngine:
         if not (0 < capacity <= 1.0):
             raise ValueError("capacity must be in (0, 1]")
 
-        # ---------- 1) Stratified subsampling ----------
-        if capacity < 1.0:
-            rdm = Random(seed)
+        # ---------- 1) Stratified subsampling (sur les ITEMS, donc attention) ----------
+        # ⚠️ Ici, items contient potentiellement plusieurs fichiers par image de base.
+        # Si tu appliques capacity ici, tu risques de casser des groupes (il manquera des tfs).
+        # => On applique plutôt capacity APRÈS regroupement, au niveau "image de base".
+        # Donc on ne fait rien ici sur items.
 
-            items_by_class = defaultdict(list)
-            for path, label in items:
-                items_by_class[label].append((path, label))
+        tf_names = [tf.name for tf in self.tfs]  # ex: ["GaussianMask", "Masked", ...]
+        tf_set = set(tf_names)
 
-            limited_items: List[Tuple[Path, int]] = []
+        # ---------- 2) Regrouper par image de base ----------
+        # Key = (label, parent_dir, base_stem) pour éviter collisions si mêmes noms dans dossiers différents
+        groups: Dict[Tuple[int, str, str], Dict[str, Path]] = defaultdict(dict)
 
-            print(f"📉 Applying capacity limit: {int(capacity * 100)}%")
+        skipped_non_tf = 0
+        for p, label in items:
+            stem = p.stem
 
-            for label, class_items in items_by_class.items():
-                n_total = len(class_items)
-                n_keep = max(1, int(n_total * capacity))
-
-                rdm.shuffle(class_items)
-                kept = class_items[:n_keep]
-
-                limited_items.extend(kept)
-
-                print(
-                    f"  class {label}: "
-                    f"{n_keep}/{n_total} images kept"
-                )
-
-            items = limited_items
-            rdm.shuffle(items)
-
-            print(f"📦 Total images after limit: {len(items)}")
-
-        # ---------- 2) Load images ----------
-        X_list = []
-        y_list = []
-
-        for idx, (img_path, label) in enumerate(items, start=1):
-            img = cv2.imread(str(img_path))
-            if img is None:
-                print(f"⚠️  Could not load image: {img_path}")
+            base_stem, tf_name = _base_stem_and_tf_name(stem, tf_names)
+            if base_stem is None or tf_name is None:
+                # ignore original/other files
+                skipped_non_tf += 1
                 continue
 
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            img = cv2.resize(img, img_size)
+            key = (int(label), str(p.parent), base_stem)
+            groups[key][tf_name] = p
 
-            img = img.astype(np.float32) / 255.0
-            img = np.transpose(img, (2, 0, 1))
+        if not groups:
+            raise ValueError("No transformed items found in 'items'. (Expected files like <base>_<TfName>.png)")
 
-            X_list.append(img)
-            y_list.append(label)
+        # ---------- 3) Construire la liste des "samples" complets (qui ont les 5 tfs) ----------
+        samples: List[Tuple[List[Path], int]] = []
+        missing_groups = 0
+
+        for (label, parent_str, base_stem), tf_map in groups.items():
+            if tf_set.issubset(tf_map.keys()):
+                ordered_paths = [tf_map[name] for name in tf_names]  # ordre fixe des channels
+                samples.append((ordered_paths, label))
+            else:
+                missing_groups += 1
+
+        if not samples:
+            raise ValueError(
+                "No complete samples with all transforms were found. "
+                f"Groups total={len(groups)}, missing_groups={missing_groups}."
+            )
+
+        print(f"🧩 Grouping done: {len(groups)} groups")
+        print(f"✅ Complete samples (all {len(tf_names)} transforms): {len(samples)}")
+        if missing_groups:
+            print(f"⚠️ Incomplete groups skipped: {missing_groups}")
+        if skipped_non_tf:
+            print(f"ℹ️ Non-transform files ignored: {skipped_non_tf}")
+
+        # ---------- 4) Capacity STRATIFIÉE au niveau sample ----------
+        if capacity < 1.0:
+            rdm = Random(seed)
+            samples_by_class: Dict[int, List[Tuple[List[Path], int]]] = defaultdict(list)
+            for s in samples:
+                samples_by_class[s[1]].append(s)
+
+            limited_samples: List[Tuple[List[Path], int]] = []
+            print(f"📉 Applying capacity limit on samples: {int(capacity * 100)}%")
+
+            for label, class_samples in samples_by_class.items():
+                n_total = len(class_samples)
+                n_keep = max(1, int(n_total * capacity))
+                rdm.shuffle(class_samples)
+                limited_samples.extend(class_samples[:n_keep])
+                print(f"  class {label}: {n_keep}/{n_total} samples kept")
+
+            samples = limited_samples
+            rdm.shuffle(samples)
+            print(f"📦 Total samples after limit: {len(samples)}")
+
+        # ---------- 5) Charger les 5 PNG en grayscale -> stack (5,H,W) ----------
+        X_list: List[torch.Tensor] = []
+        y_list: List[int] = []
+
+        for idx, (paths_5, label) in enumerate(samples, start=1):
+            channels: List[np.ndarray] = []
+            ok = True
+
+            for p in paths_5:
+                ch = cv2.imread(str(p), cv2.IMREAD_GRAYSCALE)  # (H,W)
+                if ch is None:
+                    print(f"⚠️ Could not read: {p}")
+                    ok = False
+                    break
+
+                ch = cv2.resize(ch, img_size)
+                ch = ch.astype(np.float32) / 255.0
+                channels.append(ch)
+
+            if not ok:
+                continue
+
+            x = torch.from_numpy(np.stack(channels, axis=0))  # (5,H,W)
+            X_list.append(x)
+            y_list.append(int(label))
 
             if idx % 500 == 0:
-                print(f"  Loaded {idx}/{len(items)} images")
+                print(f"  Loaded {idx}/{len(samples)} samples")
 
         if not X_list:
-            raise ValueError("No images could be loaded from augmented items.")
+            raise ValueError("No samples could be loaded (all failed during cv2.imread).")
 
-        X = torch.from_numpy(np.stack(X_list, axis=0))
+        X = torch.stack(X_list, dim=0)  # (N, 5, H, W)
         y = torch.tensor(y_list, dtype=torch.long)
 
+        expected_c = len(self.tfs)
+        if X.shape[1] != expected_c:
+            raise ValueError(f"Expected {expected_c} channels, got {tuple(X.shape)}")
+
         return X, y
+    
+    def extract_transformed_items(
+        self,
+        items: List[Tuple[Path, int]],
+        transform_dir: Path
+    ) -> List[Tuple[Path, int]]:
+        """
+        À partir d'items du dataset original (image_path, class_id),
+        retourne UNIQUEMENT les items correspondant aux images transformées
+        déjà générées dans transform_dir.
+
+        Hypothèses :
+        - transform_dir contient un mirroring exact de la structure source
+        - naming : <stem>_<TransformName>.png
+        """
+
+        tf_names = [tf.name for tf in self.tfs]
+        transformed_items: List[Tuple[Path, int]] = []
+
+        for img_path, class_id in items:
+            # ⚠️ On reconstruit le chemin relatif à partir de la racine du dataset
+            # => on enlève le premier dossier (classe) implicitement via parent
+            # Exemple:
+            # dataset/train/Apple_Black_rot/img1.jpg
+            # transform/train/Apple_Black_rot/img1_<TF>.png
+
+            class_dir = img_path.parent.name
+            stem = img_path.stem
+
+            out_dir = transform_dir / class_dir
+
+            for tf_name in tf_names:
+                tf_path = out_dir / f"{stem}_{tf_name}.png"
+                # print(f"{tf_path}")
+                if tf_path.exists():
+                    # print("exist")
+                    transformed_items.append((tf_path, int(class_id)))
+                else:
+                    # volontairement silencieux
+                    # print(f"⚠️ Missing transform: {tf_path}")
+                    pass
+
+        return transformed_items
+
     
 
 class BatchTransformer:

@@ -18,7 +18,7 @@ import torch.nn as nn
 class ModelConfig:
     """Configuration du modèle PyTorch"""
     num_classes: int = 0
-    input_channels: int = 6  # Nombre de transformations
+    input_channels: int = 7  # Nombre de transformations
     img_size: Tuple[int, int] = (224, 224)
     seed: int = 42
     extra: Dict[str, Any] = field(default_factory=dict)
@@ -280,14 +280,16 @@ class PyTorchModelBundle:
         if tensor.dim() == 3:
             tensor = tensor.unsqueeze(0)  # [1,C,H,W]
 
-        # Force RGB
-        if tensor.size(1) != 3:
-            if tensor.size(1) > 3:
-                tensor = tensor[:, :3, :, :]          # drop extra channels
-            elif tensor.size(1) == 1:
-                tensor = tensor.repeat(1, 3, 1, 1)    # grayscale -> RGB
-            else:
-                raise ValueError(f"Unexpected channel count: {tensor.size(1)}")
+        # Nombre de channels attendus par le modèle
+        expected_c = int(getattr(self.cfg, "input_channels", tensor.size(1)))
+
+        got_c = int(tensor.size(1))
+        if got_c != expected_c:
+            raise ValueError(
+                f"Channel mismatch: model expects C={expected_c} but got C={got_c}. "
+                f"If the model expects 5, you must provide a 5-channel tensor "
+                f"(e.g., from TransformationEngine.apply_all_as_tensor)."
+            )
 
         tensor = tensor.to(self.device)
 
@@ -296,10 +298,8 @@ class PyTorchModelBundle:
             probs_tensor = torch.softmax(outputs, dim=1)
             pred_id = torch.argmax(probs_tensor, dim=1).item()
 
-            probs_np = probs_tensor.cpu().numpy()[0]
-            probs = {
-                self.labels.decode(i): float(probs_np[i])
-                for i in range(len(probs_np))
-            }
+            probs_np = probs_tensor.detach().cpu().numpy()[0]
+            probs = {self.labels.decode(i): float(probs_np[i]) for i in range(len(probs_np))}
 
         return pred_id, probs
+

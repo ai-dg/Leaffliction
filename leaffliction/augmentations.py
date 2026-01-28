@@ -11,7 +11,7 @@ from collections import defaultdict
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
-
+import sys
 
 class AugmentationEngine:
     """
@@ -135,12 +135,14 @@ class AugmentationEngine:
                     suffix
                 )
                 pm.ensure_dir(augm_path.parent)
+                augmented_items.append((augm_path, item[1]))
                 if augm_path.exists():
                     print(f"⏭️  Skipped existing file: {augm_path}")
                     continue
                 cv2.imwrite(str(augm_path), transformed_image)
-                augmented_items.append((augm_path, item[1]))
 
+        # print(augmented_items)
+        # sys.exit(1)
         train_items.extend(augmented_items)
         rdm = Random(seed)
         rdm.shuffle(train_items)
