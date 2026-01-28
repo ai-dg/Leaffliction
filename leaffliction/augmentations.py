@@ -137,6 +137,7 @@ class AugmentationEngine:
                 pm.ensure_dir(augm_path.parent)
                 if augm_path.exists():
                     print(f"⏭️  Skipped existing file: {augm_path}")
+                    augmented_items.append((augm_path, item[1]))
                     continue
                 cv2.imwrite(str(augm_path), transformed_image)
                 augmented_items.append((augm_path, item[1]))

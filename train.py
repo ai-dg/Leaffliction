@@ -29,7 +29,7 @@ def main() -> None:
         img_size=(getattr(args, "img_h", 224), getattr(args, "img_w", 224)),
         augment_train=getattr(args, "augment", False),
         transform_train=getattr(args, "transform", True),
-        augmentations_per_image=getattr(args, "aug_per_image", 3),
+        augmentations_per_image=getattr(args, "aug_per_image", 3), # TODO - rm
     )
 
     # Composants
