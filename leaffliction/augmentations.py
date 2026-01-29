@@ -26,7 +26,7 @@ class AugmentationEngine:
     to disk as new dataset items.
     """
 
-    augs = {
+    augs_demo = {
         "Rotate": A.Rotate(
             limit=(-15, 15),
             p=1.0
@@ -53,6 +53,41 @@ class AugmentationEngine:
             p=1.0
         ),
     }
+    augs = {
+        "Rotate": A.Rotate(
+            limit=(-8, 8), 
+            p=0.25
+        ),
+
+        "Blur": A.GaussianBlur(
+            blur_limit=(3, 5),
+            sigma_limit=(0.1, 1.0),
+            p=0.10
+        ),
+
+        "Contrast": A.ColorJitter(
+            contrast=(0.9, 1.1),
+            p=0.20
+        ),
+
+        "Scaling": A.Affine(
+            scale=(0.95, 1.05),
+            p=0.20
+        ),
+
+        "Illumination": A.ColorJitter(
+            brightness=(0.95, 1.05),
+            p=0.20
+        ),
+
+        "Projective": A.Perspective(
+            scale=(0.005, 0.03),
+            keep_size=True,
+            fit_output=False,
+            p=0.08
+        ),
+    }
+
 
     def apply_all(self, img: np.ndarray) -> Dict[str, np.ndarray]:
         """
@@ -72,30 +107,83 @@ class AugmentationEngine:
             for name, augmentation in self.augs.items()
             }
 
-    def augment_dataset(
-            self,
-            train_items: List[Tuple[Path, int]],
-            seed: int,
-            dataset_dir: Path,
-            output_dir: Path,
-            ) -> List[Tuple[Path, int]]:
-        """
-        Augment the training dataset to balance class distributions.
+    # def augment_dataset(
+    #         self,
+    #         train_items: List[Tuple[Path, int]],
+    #         seed: int,
+    #         dataset_dir: Path,
+    #         output_dir: Path,
+    #         ) -> List[Tuple[Path, int]]:
+    #     """
+    #     Augment the training dataset to balance class distributions.
 
-        For each under-represented class, augmentations are applied
-        iteratively to existing images until the class reaches the
-        target number of samples. If all images are exhausted and the
-        deficit remains, the process restarts with randomized transforms.
+    #     For each under-represented class, augmentations are applied
+    #     iteratively to existing images until the class reaches the
+    #     target number of samples. If all images are exhausted and the
+    #     deficit remains, the process restarts with randomized transforms.
 
-        Args:
-            train_items: Training set as (image_path, class_id) tuples.
-            seed: Random seed for reproducible shuffling.
-            dataset_dir: Root directory of the original dataset
-            output_dir: Root directory where augmented images are saved.
+    #     Args:
+    #         train_items: Training set as (image_path, class_id) tuples.
+    #         seed: Random seed for reproducible shuffling.
+    #         dataset_dir: Root directory of the original dataset
+    #         output_dir: Root directory where augmented images are saved.
 
-        Returns:
-            The augmented training set, including newly generated samples.
-        """
+    #     Returns:
+    #         The augmented training set, including newly generated samples.
+    #     """
+    #     pm = PathManager()
+
+    #     train_items_grouped = defaultdict(list)
+    #     for item in train_items:
+    #         train_items_grouped[item[1]].append(item)
+
+    #     target_count = len(max(train_items_grouped.values(), key=len))
+
+    #     augmentations = list(self.augs.keys())
+    #     nb_augs = len(augmentations)
+
+    #     augmented_items = []
+    #     for class_id, items in train_items_grouped.items():
+    #         current_count = len(items)
+    #         deficit = target_count - current_count
+
+    #         total_nb_pass = target_count // (current_count * nb_augs) + 1
+    #         # Use a round-robin strategy to cycle through augmentations
+    #         # and source images evenly when generating new samples.
+    #         for gen_img_count in range(deficit):
+    #             augm_name = augmentations[gen_img_count % nb_augs]
+    #             item = items[(gen_img_count // nb_augs) % current_count]
+
+    #             image = cv2.imread(str(item[0]), cv2.IMREAD_COLOR_RGB)
+
+    #             result = self.augs[augm_name](image=image)
+    #             transformed_image = result['image']
+
+    #             pass_id = (gen_img_count // nb_augs) // current_count
+    #             suffix = (
+    #                 f"_{augm_name}{pass_id}"
+    #                 if total_nb_pass > 1
+    #                 else f"_{augm_name}"
+    #             )
+    #             augm_path = pm.make_suffixed_path(
+    #                 pm.mirror_path(item[0], dataset_dir, output_dir),
+    #                 suffix
+    #             )
+    #             pm.ensure_dir(augm_path.parent)
+    #             augmented_items.append((augm_path, item[1]))
+    #             if augm_path.exists():
+    #                 print(f"⏭️  Skipped existing file: {augm_path}")
+    #                 continue
+    #             cv2.imwrite(str(augm_path), transformed_image)
+
+    #     # print(augmented_items)
+    #     # sys.exit(1)
+    #     train_items.extend(augmented_items)
+    #     rdm = Random(seed)
+    #     rdm.shuffle(train_items)
+    #     return train_items
+
+    def augment_dataset(self, train_items, seed, dataset_dir, output_dir):
         pm = PathManager()
 
         train_items_grouped = defaultdict(list)
@@ -103,50 +191,53 @@ class AugmentationEngine:
             train_items_grouped[item[1]].append(item)
 
         target_count = len(max(train_items_grouped.values(), key=len))
-
         augmentations = list(self.augs.keys())
         nb_augs = len(augmentations)
 
         augmented_items = []
+
         for class_id, items in train_items_grouped.items():
             current_count = len(items)
             deficit = target_count - current_count
+            if deficit <= 0:
+                continue
 
-            total_nb_pass = target_count // (current_count * nb_augs) + 1
-            # Use a round-robin strategy to cycle through augmentations
-            # and source images evenly when generating new samples.
             for gen_img_count in range(deficit):
                 augm_name = augmentations[gen_img_count % nb_augs]
                 item = items[(gen_img_count // nb_augs) % current_count]
 
-                image = cv2.imread(str(item[0]), cv2.IMREAD_COLOR_RGB)
+                image = cv2.imread(str(item[0]), cv2.IMREAD_COLOR)
+                if image is None:
+                    print(f"⚠️  Could not load image: {item[0]}")
+                    continue
 
-                result = self.augs[augm_name](image=image)
-                transformed_image = result['image']
+                transformed_image = self.augs[augm_name](image=image)["image"]
 
                 pass_id = (gen_img_count // nb_augs) // current_count
-                suffix = (
-                    f"_{augm_name}{pass_id}"
-                    if total_nb_pass > 1
-                    else f"_{augm_name}"
-                )
+                suffix = f"_{augm_name}{pass_id}" if pass_id > 0 else f"_{augm_name}"
+
                 augm_path = pm.make_suffixed_path(
                     pm.mirror_path(item[0], dataset_dir, output_dir),
                     suffix
                 )
                 pm.ensure_dir(augm_path.parent)
-                augmented_items.append((augm_path, item[1]))
-                if augm_path.exists():
-                    print(f"⏭️  Skipped existing file: {augm_path}")
-                    continue
-                cv2.imwrite(str(augm_path), transformed_image)
 
-        # print(augmented_items)
-        # sys.exit(1)
-        train_items.extend(augmented_items)
-        rdm = Random(seed)
-        rdm.shuffle(train_items)
+                if augm_path.exists():
+                    # fichier déjà présent: on peut l’ajouter, il est valide
+                    augmented_items.append((augm_path, class_id))
+                    continue
+
+                ok = cv2.imwrite(str(augm_path), transformed_image)
+                if not ok:
+                    print(f"⚠️  Failed to write: {augm_path}")
+                    continue
+
+                augmented_items.append((augm_path, class_id))
+
+        train_items = list(train_items) + augmented_items
+        Random(seed).shuffle(train_items)
         return train_items
+
     
     def load_augmented_items(
             self,

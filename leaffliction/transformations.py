@@ -346,13 +346,13 @@ class TransformationEngine:
     @classmethod
     def default_six(cls) -> "TransformationEngine":
         tfs: List[Transformation] = [
-            GrayscaleL(),
+            # GrayscaleL(),
             Hue(),
             # Thresh(threshold=35, fill_size=200),
             # Filled(threshold=35, fill_size=200),
-            GaussianMask(threshold=120, fill_size=200),
+            # GaussianMask(threshold=120, fill_size=200),
             Masked(threshold=35, fill_size=200),
-            RoiImage(),
+            # RoiImage(),
             AnalyzeImage(),
             PseudoLandmarks(threshold=35, fill_size=200),
         ]
