@@ -8,6 +8,7 @@ venv/
 env/
 
 # Training outputs / ML artifacts
+augmented_directory/
 training_artifacts/
 training_artifacts.zip
 *.zip
