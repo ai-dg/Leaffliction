@@ -1,8 +1,3 @@
-"""Image augmentation and dataset balancing through transforms.
-
-Provides augmentation engine for applying transforms (rotation, blur, contrast, etc.),
-saving augmented images, and balancing datasets by oversampling under-represented classes.
-"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -14,9 +9,7 @@ from leaffliction.utils import PathManager
 from random import Random
 from collections import defaultdict
 import torch
-import torch.nn as nn
-from torch.utils.data import TensorDataset, DataLoader
-import sys
+
 
 class AugmentationEngine:
     """
@@ -71,7 +64,7 @@ class AugmentationEngine:
     }
     augs = {
         "Rotate": A.Rotate(
-            limit=(-8, 8), 
+            limit=(-8, 8),
             p=0.25
         ),
 
@@ -104,7 +97,6 @@ class AugmentationEngine:
         ),
     }
 
-
     def apply_all(self, img: np.ndarray) -> Dict[str, np.ndarray]:
         """
         Apply all defined augmentations to a single image.
@@ -121,8 +113,8 @@ class AugmentationEngine:
         return {
             name: augmentation(image=img)['image']
             for name, augmentation in self.augs.items()
-            }
-    
+        }
+
     def apply_all_script(self, img: np.ndarray) -> Dict[str, np.ndarray]:
         """
         Apply all defined augmentations to a single image.
@@ -139,8 +131,7 @@ class AugmentationEngine:
         return {
             name: augmentation(image=img)['image']
             for name, augmentation in self.augs_demo.items()
-            }
-    
+        }
 
     # def augment_dataset(
     #         self,
@@ -266,7 +257,8 @@ class AugmentationEngine:
                 transformed_image = self.augs[augm_name](image=image)["image"]
 
                 pass_id = (gen_img_count // nb_augs) // current_count
-                suffix = f"_{augm_name}{pass_id}" if pass_id > 0 else f"_{augm_name}"
+                suffix = (f"_{augm_name}{pass_id}" if pass_id > 0
+                          else f"_{augm_name}")
 
                 augm_path = pm.make_suffixed_path(
                     pm.mirror_path(item[0], dataset_dir, output_dir),
@@ -290,12 +282,11 @@ class AugmentationEngine:
         Random(seed).shuffle(train_items)
         return train_items
 
-    
     def load_augmented_items(
-            self,
-            items: List[Tuple[Path, int]],
-            img_size: Tuple[int, int] = (224, 224)
-        ) -> Tuple[torch.Tensor, torch.Tensor]:
+        self,
+        items: List[Tuple[Path, int]],
+        img_size: Tuple[int, int] = (224, 224)
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Load augmented images from disk and return as PyTorch tensors.
 
@@ -337,7 +328,6 @@ class AugmentationEngine:
         return X, y
 
 
-
 class AugmentationSaver:
     """
     Utility class for saving augmented images to disk.
@@ -364,7 +354,7 @@ class AugmentationSaver:
             image_path: Path,
             output_dir: Path,
             results: Dict[str, np.ndarray]
-            ) -> List[Path]:
+    ) -> List[Path]:
         """
         Saves all augmented versions of an image to disk.
 

@@ -1,22 +1,20 @@
-# leaffliction/transformations.py
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Protocol, Tuple, Any, Optional
+from typing import Dict, List, Protocol, Tuple, Optional
 
 import cv2
 import numpy as np
 import torch
 from plantcv import plantcv as pcv
 import rembg
-import matplotlib.pyplot as plt
 from leaffliction.utils import PathManager
 from collections import defaultdict
 from random import Random
 from leaffliction.utils import Logger
-from leaffliction.plotting import Plotter
 import sys
+
 
 def _ensure_uint8(img: np.ndarray) -> np.ndarray:
     """
@@ -108,7 +106,8 @@ class TransformationPipeline:
 
     def ensure_base(self, threshold: int = 35, fill_size: int = 200) -> None:
         """
-        Compute and cache base transformations (background removal, grayscale, etc.).
+        Compute and cache base transformations (background removal,
+        grayscale, etc.).
 
         :param threshold: Threshold value for binary operations.
         :type threshold: int
@@ -126,10 +125,9 @@ class TransformationPipeline:
         img_no_bg = _to_bgr_if_bgra(_ensure_uint8(img_no_bg))
         self.set("img_no_bg", img_no_bg)
 
-
         grayscale = pcv.rgb2gray_lab(rgb_img=img_no_bg, channel="l")
         grayscale = _ensure_uint8(grayscale)
-        
+
         # pcv.plot_image(grayscale)
 
         mean_L = float(grayscale.mean())
@@ -140,27 +138,32 @@ class TransformationPipeline:
             clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
             L = clahe.apply(grayscale)
             gamma = 0.7
-            L = np.clip(((L / 255.0) ** gamma) * 255.0, 0, 255).astype(np.uint8)
+            L = np.clip(
+                ((L / 255.0) ** gamma) * 255.0,
+                0,
+                255).astype(
+                np.uint8)
 
             grayscale = L
 
         self.set("grayscale_l", grayscale)
 
-
-        thresh = pcv.threshold.binary(gray_img=grayscale, threshold=threshold, object_type="light")
+        thresh = pcv.threshold.binary(
+            gray_img=grayscale,
+            threshold=threshold,
+            object_type="light")
         thresh = _ensure_uint8(thresh)
         white_ratio = (thresh > 0).mean()
         if white_ratio < 0.02 or white_ratio > 0.98:
-            thresh = pcv.threshold.otsu(gray_img=grayscale, object_type="light")
+            thresh = pcv.threshold.otsu(
+                gray_img=grayscale, object_type="light")
             thresh = _ensure_uint8(thresh)
-        
-        self.set("thresh", thresh)
 
+        self.set("thresh", thresh)
 
         filled = pcv.fill(bin_img=thresh, size=fill_size)
         filled = _ensure_uint8(filled)
         self.set("filled", filled)
-
 
         gaussian = pcv.gaussian_blur(img=filled, ksize=(3, 3))
         gaussian = _ensure_uint8(gaussian)
@@ -176,7 +179,6 @@ class TransformationPipeline:
         hue_255 = (hue.astype(np.float32) * (255.0 / 179.0)).astype(np.uint8)
         self.set("hue", hue_255)
 
-
     def ensure_roi(self) -> None:
         """
         Compute and cache region of interest (ROI) transformations.
@@ -188,7 +190,8 @@ class TransformationPipeline:
             return
 
         if not self.has("filled") or not self.has("masked"):
-            raise RuntimeError("Base pipeline not computed. Call ensure_base() first.")
+            raise RuntimeError(
+                "Base pipeline not computed. Call ensure_base() first.")
 
         image = _ensure_uint8(self.img)
         masked = self.get("masked")
@@ -240,7 +243,6 @@ class Transformation(Protocol):
 
     def apply(self, ctx: TransformationPipeline) -> np.ndarray:
         ...
-
 
 
 @dataclass
@@ -370,6 +372,7 @@ class Masked:
         ctx.ensure_base(threshold=self.threshold, fill_size=self.fill_size)
         return ctx.get("masked")
 
+
 @dataclass
 class Hue:
     """
@@ -388,6 +391,7 @@ class Hue:
         """
         ctx.ensure_base()
         return ctx.get("hue")
+
 
 @dataclass
 class RoiImage:
@@ -412,7 +416,11 @@ class RoiImage:
         return ctx.get("roi_image")
 
 
-def _draw_pseudolandmarks(image: np.ndarray, pseudolandmarks, color_bgr, radius: int) -> np.ndarray:
+def _draw_pseudolandmarks(
+        image: np.ndarray,
+        pseudolandmarks,
+        color_bgr,
+        radius: int) -> np.ndarray:
     """
     Draw pseudolandmark points on an image.
 
@@ -447,6 +455,7 @@ def _draw_pseudolandmarks(image: np.ndarray, pseudolandmarks, color_bgr, radius:
 
     return out
 
+
 @dataclass
 class AnalyzeImage:
     """
@@ -469,12 +478,10 @@ class AnalyzeImage:
         img = _ensure_uint8(ctx.img)
         labeled_mask = ctx.get("kept_mask")
 
-
         out = pcv.analyze.size(img=img, labeled_mask=labeled_mask)
 
-        
         if out is None:
-        
+
             out = img.copy()
 
         return _ensure_uint8(out)
@@ -513,14 +520,17 @@ class PseudoLandmarks:
         # Red
         pseudo_img = _draw_pseudolandmarks(pseudo_img, top_x, (255, 0, 0), 5)
         # Magenta
-        pseudo_img = _draw_pseudolandmarks(pseudo_img, bottom_x, (255, 0, 255), 5)
+        pseudo_img = _draw_pseudolandmarks(
+            pseudo_img, bottom_x, (255, 0, 255), 5)
         # Blue
-        pseudo_img = _draw_pseudolandmarks(pseudo_img, center_v_x, (0, 0, 255), 5)
+        pseudo_img = _draw_pseudolandmarks(
+            pseudo_img, center_v_x, (0, 0, 255), 5)
 
         return _ensure_uint8(pseudo_img)
 
 
-def _base_stem_and_tf_name(stem: str, tf_names: List[str]) -> Tuple[Optional[str], Optional[str]]:
+def _base_stem_and_tf_name(
+        stem: str, tf_names: List[str]) -> Tuple[Optional[str], Optional[str]]:
     """
     Extract base filename and transformation name from a stem.
 
@@ -544,7 +554,8 @@ class TransformationEngine:
     Engine for applying multiple transformations to images.
     """
 
-    def __init__(self, tfs: List[Transformation], verbose : bool = True) -> None:
+    def __init__(self, tfs: List[Transformation],
+                 verbose: bool = True) -> None:
         """
         Initialize the transformation engine.
 
@@ -560,7 +571,7 @@ class TransformationEngine:
         self.logger = Logger(verbose)
 
     @classmethod
-    def default_six(cls, verbose : bool = True) -> "TransformationEngine":
+    def default_six(cls, verbose: bool = True) -> "TransformationEngine":
         """
         Create engine with default six transformations for visualization.
 
@@ -579,9 +590,9 @@ class TransformationEngine:
             PseudoLandmarks(threshold=35, fill_size=200),
         ]
         return cls(tfs=tfs, verbose=verbose)
-    
+
     @classmethod
-    def trainning(cls, verbose : bool = True) -> "TransformationEngine":
+    def trainning(cls, verbose: bool = True) -> "TransformationEngine":
         """
         Create engine with transformations optimized for training.
 
@@ -597,9 +608,12 @@ class TransformationEngine:
             PseudoLandmarks(threshold=35, fill_size=200),
         ]
         return cls(tfs=tfs, verbose=verbose)
-    
+
     @classmethod
-    def only_selected(cls, only: list[str], verbose : bool = True) -> "TransformationEngine":
+    def only_selected(
+            cls,
+            only: list[str],
+            verbose: bool = True) -> "TransformationEngine":
         """
         Create engine with only specified transformations.
 
@@ -611,7 +625,8 @@ class TransformationEngine:
         :rtype: TransformationEngine
         """
         if not isinstance(only, list) or len(only) == 0:
-            raise ValueError("only_selected expects a non-empty list of transformations")
+            raise ValueError(
+                "only_selected expects a non-empty list of transformations")
 
         mapping = {
             "grayscale": GrayscaleL(),
@@ -636,7 +651,6 @@ class TransformationEngine:
 
         return cls(tfs=tfs, verbose=verbose)
 
-
     def apply_all(self, img: np.ndarray) -> Dict[str, np.ndarray]:
         """
         Apply all transformations and return results as dictionary.
@@ -655,10 +669,7 @@ class TransformationEngine:
         # if ctx.has("kept_mask"):
         #     results["kept_mask"] = ctx.get("kept_mask")
 
-
         return results
-    
-
 
     def apply_all_as_tensor(self, img: np.ndarray) -> torch.Tensor:
         """
@@ -675,7 +686,6 @@ class TransformationEngine:
         for tf in self.tfs:
             transformed = tf.apply(ctx)
 
-  
             gray = _to_gray_if_color(transformed)
             gray = _ensure_uint8(gray)
 
@@ -719,7 +729,7 @@ class TransformationEngine:
         X = torch.stack(X_list)
         y = torch.tensor(y_list, dtype=torch.long)
         return X, y
-    
+
     def load_transformer_items(
         self,
         items: List[Tuple[Path, int]],
@@ -745,7 +755,6 @@ class TransformationEngine:
         if not (0 < capacity <= 1.0):
             self.logger.error("capacity must be in (0, 1]")
             sys.exit(1)
-
 
         tf_names = [tf.name for tf in self.tfs]
         tf_set = set(tf_names)
@@ -781,37 +790,41 @@ class TransformationEngine:
         if not samples:
             self.logger.error(
                 "No complete samples with all transforms were found. "
-                f"Groups total={len(groups)}, missing_groups={missing_groups}.")
+                f"Groups total={len(groups)}, "
+                f"missing_groups={missing_groups}.")
             sys.exit(1)
 
         self.logger.info(f"Grouping done: {len(groups)} groups")
-        self.logger.info(f"Complete samples (all {len(tf_names)} transforms): {len(samples)}")
+        self.logger.info(
+            f"Complete samples (all {len(tf_names)} transforms): "
+            f"{len(samples)}")
         if missing_groups:
             self.logger.info(f"Incomplete groups skipped: {missing_groups}")
         if skipped_non_tf:
             self.logger.info(f"Non-transform files ignored: {skipped_non_tf}")
 
-
         if capacity < 1.0:
             rdm = Random(seed)
-            samples_by_class: Dict[int, List[Tuple[List[Path], int]]] = defaultdict(list)
+            samples_by_class: Dict[int, List[Tuple[List[Path], int]]] = (
+                defaultdict(list))
             for s in samples:
                 samples_by_class[s[1]].append(s)
 
             limited_samples: List[Tuple[List[Path], int]] = []
-            self.logger.info(f"Applying capacity limit on samples: {int(capacity * 100)}%")
+            self.logger.info(
+                f"Applying capacity limit on samples: {int(capacity * 100)}%")
 
             for label, class_samples in samples_by_class.items():
                 n_total = len(class_samples)
                 n_keep = max(1, int(n_total * capacity))
                 rdm.shuffle(class_samples)
                 limited_samples.extend(class_samples[:n_keep])
-                self.logger.info(f"  class {label}: {n_keep}/{n_total} samples kept")
+                self.logger.info(
+                    f"  class {label}: {n_keep}/{n_total} samples kept")
 
             samples = limited_samples
             rdm.shuffle(samples)
             self.logger.info(f"Total samples after limit: {len(samples)}")
-
 
         X_list: List[torch.Tensor] = []
         y_list: List[int] = []
@@ -842,7 +855,8 @@ class TransformationEngine:
                 self.logger.info(f"  Loaded {idx}/{len(samples)} samples")
 
         if not X_list:
-            self.logger.error("No samples could be loaded (all failed during cv2.imread).")
+            self.logger.error(
+                "No samples could be loaded (all failed during cv2.imread).")
             sys.exit(1)
 
         X = torch.stack(X_list, dim=0)  # (N, 5, H, W)
@@ -850,11 +864,12 @@ class TransformationEngine:
 
         expected_c = len(self.tfs)
         if X.shape[1] != expected_c:
-            self.logger.error(f"Expected {expected_c} channels, got {tuple(X.shape)}")
+            self.logger.error(
+                f"Expected {expected_c} channels, got {tuple(X.shape)}")
             sys.exit(1)
 
         return X, y
-    
+
     def extract_transformed_items(
         self,
         items: List[Tuple[Path, int]],
@@ -890,14 +905,16 @@ class TransformationEngine:
 
         return transformed_items
 
-    
 
 class TransformationDirectory:
     """
     Batch processor for applying transformations to entire directories.
     """
 
-    def __init__(self, engine: TransformationEngine, verbose : bool = True) -> None:
+    def __init__(
+            self,
+            engine: TransformationEngine,
+            verbose: bool = True) -> None:
         """
         Initialize the directory transformer.
 
@@ -962,7 +979,7 @@ class TransformationDirectory:
         :rtype: List[Tuple[Path, int]]
         """
 
-        self.logger.info(f"TransformationDirectory.run")
+        self.logger.info("TransformationDirectory.run")
         self.logger.info(f"  src = {src}")
         self.logger.info(f"  dst = {dst}")
         self.logger.info(f"  recursive = {recursive}")
@@ -1011,9 +1028,11 @@ class TransformationDirectory:
             ]
 
             if missing_tf_names:
-                self.logger.info(f"    missing transforms = {missing_tf_names}")
+                self.logger.info(
+                    f"    missing transforms = {missing_tf_names}")
             else:
-                self.logger.info(f"    all transforms already exist (nothing to do)")
+                self.logger.info(
+                    "    all transforms already exist (nothing to do)")
 
                 for name in tf_names:
                     items.append((out_dir / f"{stem}_{name}.png", class_id))
@@ -1022,7 +1041,7 @@ class TransformationDirectory:
             self.logger.info("    Loading image")
             img = cv2.imread(str(p))
             if img is None:
-                self.logger.error(f"   Could not load image, skipping")
+                self.logger.error("   Could not load image, skipping")
                 continue
 
             img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -1039,7 +1058,8 @@ class TransformationDirectory:
 
                 out_path = out_dir / f"{stem}_{tf.name}.png"
                 if out_path.exists():
-                    self.logger.info(f"      {tf.name} appeared meanwhile, skip")
+                    self.logger.info(
+                        f"      {tf.name} appeared meanwhile, skip")
                     continue
 
                 self.logger.info(f"      Writing {tf.name} → {out_path.name}")
@@ -1051,15 +1071,13 @@ class TransformationDirectory:
 
                 cv2.imwrite(str(out_path), _ensure_uint8(out_bgr))
 
-            
             for name in tf_names:
                 items.append((out_dir / f"{stem}_{name}.png", class_id))
 
-        self.logger.info(f"\nTransformationDirectory finished")
+        self.logger.info("\nTransformationDirectory finished")
         self.logger.info(f"Total transformed items returned: {len(items)}")
 
         return items
-
 
 
 def main():
@@ -1074,4 +1092,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

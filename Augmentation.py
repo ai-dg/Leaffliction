@@ -14,10 +14,11 @@ from leaffliction.augmentations import AugmentationEngine, AugmentationSaver
 from leaffliction.plotting import Plotter
 from leaffliction.utils import Logger
 
+
 def main() -> None:
     """
     Apply augmentations to a single image from the command-line.
-    
+
     Parses CLI arguments, loads the image, applies augmentation transforms,
     displays results in a grid, and saves augmented images to disk.
     """
@@ -27,17 +28,16 @@ def main() -> None:
     output_dir = Path(args.output_dir)
     image_path = Path(args.image_path)
     logger = Logger(args.verbose)
-    
 
     img = cv2.imread(str(image_path))
     if img is None:
         logger.error(f"Error: Could not load image from {image_path}")
         return
-    
+
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
     engine = AugmentationEngine()
-    
+
     results = engine.apply_all_script(img)
 
     grid = Plotter()
@@ -46,7 +46,7 @@ def main() -> None:
     pm = PathManager()
     saver = AugmentationSaver(pm)
     saved_paths = saver.save_all(image_path, output_dir, results)
-    
+
     logger.info("Augmentations saved:")
     for path in saved_paths:
         logger.info(f"   - {path.parent}/{path.name}")

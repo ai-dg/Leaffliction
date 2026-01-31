@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from os import path
 from pathlib import Path
 import cv2
-import torch
 import sys
 from typing import Dict, Tuple
 import numpy as np
@@ -15,25 +13,30 @@ from leaffliction.model import InferenceManager
 from leaffliction.utils import Logger
 from leaffliction.plotting import Plotter
 
+
 def print_dir_predictions(
     logger,
-    results: Dict[Path, Tuple[str, str, Dict[str, float], Dict[str, np.ndarray]]],
-    cfg,
+    results: Dict[Path, Tuple[str, str, Dict[str, float],
+                              Dict[str, np.ndarray]]],
+    cfg
 ):
     """
-    Display prediction results for a directory of images and compute overall accuracy.
+    Display prediction results for a directory of images and compute
+    overall accuracy.
 
     For each image, this function prints:
     - the ground-truth label (True label),
     - the predicted label,
     - a correctness flag (TP / FP),
     - the top-k class probabilities as a textual bar chart,
-    and optionally displays the corresponding image transformations in a grid layout.
+    and optionally displays the corresponding image transformations
+    in a grid layout.
 
     At the end, it prints a summary including total accuracy and class counts.
 
-    :param results: Mapping between image paths and their prediction outputs.
-    :type results: Dict[Path, Tuple[str, str, Dict[str, float], Dict[str, np.ndarray]]]
+    :param results: Mapping between image paths and prediction outputs.
+    :type results: Dict[Path, Tuple[str, str, Dict[str, float],
+        Dict[str, np.ndarray]]]
     :param logger: Logger instance used to display formatted output.
     :type logger: Logger
     :param cfg: Prediction configuration (top_k, show_transforms, etc.).
@@ -55,7 +58,8 @@ def print_dir_predictions(
     total = 0
     correct = 0
 
-    for image_path, (true_label, predicted_label, probs, transformed) in results.items():
+    for image_path, (true_label, predicted_label, probs,
+                     transformed) in results.items():
         total += 1
 
         is_correct = (predicted_label == true_label)
@@ -98,10 +102,10 @@ def print_dir_predictions(
 
             grid = Plotter()
             grid.plot_grid(
-                f"Transformations - True: {true_label} | Pred: {predicted_label} [{verdict}]",
+                f"Transformations - True: {true_label} | "
+                f"Pred: {predicted_label} [{verdict}]",
                 transformed,
-                original=img
-            )
+                original=img)
 
     # --- Global summary ---
     accuracy = correct / total if total else 0.0
@@ -114,13 +118,15 @@ def print_dir_predictions(
     logger.info("-" * 60)
 
     logger.info("True label distribution:")
-    for label, n in sorted(true_counts.items(), key=lambda x: x[1], reverse=True):
+    for label, n in sorted(
+            true_counts.items(), key=lambda x: x[1], reverse=True):
         logger.info(f"   {label:30s} {n:4d} ({(n/total):.1%})")
 
     logger.info("-" * 60)
 
     logger.info("Predicted label distribution:")
-    for label, n in sorted(pred_counts.items(), key=lambda x: x[1], reverse=True):
+    for label, n in sorted(
+            pred_counts.items(), key=lambda x: x[1], reverse=True):
         logger.info(f"   {label:30s} {n:4d} ({(n/total):.1%})")
 
     logger.info("=" * 60)
@@ -141,18 +147,22 @@ def main() -> None:
     args = parser.parse_args()
 
     image_path: Path = args.image_path
-    dir_path : str = args.dir_path
+    dir_path: str = args.dir_path
     model_zip: Path | None = args.model_zip
     model_path: Path | None = args.model_path
     logger = Logger(args.verbose)
 
     if dir_path is None:
         if model_zip is None and model_path is None:
-            logger.error("Error: you must provide either --bundle-zip or --model-path")
+            logger.error(
+                "Error: you must provide either "
+                "--bundle-zip or --model-path")
             sys.exit(1)
 
         if model_zip is not None and model_path is not None:
-            logger.error("Error: choose ONE method between --bundle-zip OR --model-path")
+            logger.error(
+                "Error: choose ONE method between "
+                "--bundle-zip OR --model-path")
             sys.exit(1)
 
         if model_zip is not None and not model_zip.exists():
@@ -174,13 +184,11 @@ def main() -> None:
         else:
             logger.info(f"  model_path = {model_path}")
 
-
     cfg = PredictConfig(
         show_transforms=args.show_transforms,
         top_k=args.top_k,
     )
     tf_engine = TransformationEngine.trainning(args.verbose)
-
 
     predictor = Predictor(
         model_loader=InferenceManager,
@@ -207,7 +215,7 @@ def main() -> None:
             cfg=cfg
         )
         print_dir_predictions(
-            logger=logger, 
+            logger=logger,
             results=results,
             cfg=cfg
         )
@@ -224,11 +232,10 @@ def main() -> None:
         logger.info("=" * 60)
         logger.info(f"   Predicted class: {predicted_label}")
         logger.info()
-        
 
         logger.info(f"   Top {cfg.top_k} predictions:")
         sorted_probs = sorted(probs.items(), key=lambda x: x[1], reverse=True)
-        
+
         bar_width = 10
         full_char = "▰"
         empty_char = "▱"
@@ -245,12 +252,15 @@ def main() -> None:
 
         if cfg.show_transforms and transformed:
             logger.info("Showing transformations...")
-            
+
             img = cv2.imread(str(image_path))
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            
+
             grid = Plotter()
-            grid.plot_grid(f"Transformations - Predicted: {predicted_label}", transformed, original=img)
+            grid.plot_grid(
+                f"Transformations - Predicted: {predicted_label}",
+                transformed,
+                original=img)
 
 
 if __name__ == "__main__":

@@ -32,7 +32,7 @@ class ArgsManager:
             help="Directory containing the plant dataset"
         )
 
-        parser.add_argument( 
+        parser.add_argument(
             "--mode",
             choices=["both", "bar", "pie"],
             default="both",
@@ -54,7 +54,6 @@ class ArgsManager:
 
         return parser
 
-
     def build_augmentation_parser(self) -> argparse.ArgumentParser:
         """
         Build argument parser for the Augmentation script.
@@ -72,15 +71,15 @@ class ArgsManager:
         parser.add_argument(
             "image_path",
             type=str,
-            help="Path to an input image (e.g., ./Apple/apple_healthy/image (1).JPG)"
-        )
+            help="Path to an input image "
+                 "(e.g., ./Apple/apple_healthy/image (1).JPG)")
 
         parser.add_argument(
             "--output-dir",
             type=str,
             default="augmented_directory",
-            help='Output directory for augmented images (default: "augmented_directory")'
-        )
+            help='Output directory for augmented images '
+                 '(default: "augmented_directory")')
 
         parser.add_argument(
             "--verbose",
@@ -89,7 +88,6 @@ class ArgsManager:
         )
 
         return parser
-
 
     def build_transformation_parser(self) -> argparse.ArgumentParser:
         """
@@ -110,7 +108,8 @@ class ArgsManager:
             "image_path",
             nargs="?",
             type=str,
-            help="Path to an input image (e.g., ./Apple/apple_healthy/image (1).JPG)"
+            help="Path to an input image "
+                 "(e.g., ./Apple/apple_healthy/image (1).JPG)"
         )
 
         parser.add_argument(
@@ -134,13 +133,17 @@ class ArgsManager:
         parser.add_argument(
             "--only",
             nargs="+",
-            choices=["grayscale", "gaussian", "mask", "hue", "roi", "analyze", "pseudo"],
-            help="Apply only the selected transformations (default: all)"
-        )
+            choices=[
+                "grayscale",
+                "gaussian",
+                "mask",
+                "hue",
+                "roi",
+                "analyze",
+                "pseudo"],
+            help="Apply only the selected transformations (default: all)")
 
         return parser
-
-
 
     def build_train_parser(self) -> argparse.ArgumentParser:
         """
@@ -160,24 +163,23 @@ class ArgsManager:
         parser.add_argument(
             "dataset_dir",
             type=str,
-            help="Dataset root directory (images are fetched from subdirectories)."
-        )
-
+            help="Dataset root directory "
+                 "(images are fetched from subdirectories).")
 
         parser.add_argument(
             "--out-dir", "-o",
             type=str,
             default="training_artifacts",
-            help='Directory to save modified images and model artifacts (default: "training_artifacts").'
+            help='Directory to save modified images and model artifacts '
+                 '(default: "training_artifacts").'
         )
 
         parser.add_argument(
             "--out-zip",
             type=str,
             default="train_output.zip",
-            help='Output zip filename to generate (default: "train_output.zip").'
-        )
-
+            help='Output zip filename to generate '
+                 '(default: "train_output.zip").')
 
         parser.add_argument(
             "--valid-ratio",
@@ -192,7 +194,6 @@ class ArgsManager:
             default=42,
             help="Random seed for splitting/shuffling (default: 42)."
         )
-
 
         parser.add_argument(
             "--learning-rate",
@@ -222,7 +223,6 @@ class ArgsManager:
         )
 
         return parser
-
 
     def build_predict_parser(self) -> argparse.ArgumentParser:
         """
@@ -258,16 +258,16 @@ class ArgsManager:
             "--model-zip",
             type=Path,
             default=None,
-            help="Path to the training bundle zip produced by train (optional)."
-        )
+            help="Path to the training bundle zip produced by train "
+                 "(optional).")
 
         parser.add_argument(
             "--model-path",
             type=Path,
             default=None,
-            help="Path to the model/artifacts directory (optional; overrides --bundle-zip if provided)."
+            help="Path to the model/artifacts directory "
+                 "(optional; overrides --bundle-zip if provided)."
         )
-
 
         parser.add_argument(
             "--show-transforms",

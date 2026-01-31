@@ -1,22 +1,21 @@
 from __future__ import annotations
+from leaffliction.utils import Logger
+import cv2
+from math import ceil
+import numpy as np
 
-from typing import Dict, Optional, Any
+from typing import Dict, Optional
 from pathlib import Path
 import matplotlib.pyplot as plt
-import matplotlib
 plt.style.use("./style/leaffliction.mplstyle")
-import numpy as np
-from math import ceil
-import cv2
-from leaffliction.utils import Logger
-from plantcv import plantcv as pcv
 
 
 class Plotter:
     """
     Visualization utility for dataset distribution and training metrics.
     """
-    def __init__(self, verbose : bool = True):
+
+    def __init__(self, verbose: bool = True):
         """
         Initialize the plotter.
 
@@ -28,7 +27,8 @@ class Plotter:
         self.verbose = verbose
         self.logger = Logger(self.verbose)
 
-    def plot_pie(self, counts: Dict[str, int], title: str, save_to: Optional[str] = None) -> None:
+    def plot_pie(self, counts: Dict[str, int], title: str,
+                 save_to: Optional[str] = None) -> None:
         """
         Plot class distribution as a pie chart.
 
@@ -43,13 +43,16 @@ class Plotter:
         """
         counts_array = [value for key, value in counts.items()]
 
-        self.logger.info(f"Number of elements to classify: {sum([v for k, v in counts.items()])}")
+        self.logger.info(
+            f"Number of elements to classify: "
+            f"{sum([v for k, v in counts.items()])}")
         self.logger.info(f"Number of classes to plot : {len(counts_array)}")
         self.class_names = list(counts.keys())
         for k, v in counts.items():
             self.logger.info(f"{k}:{v}")
 
         plt.figure()
+        class_names = list(counts.keys())
         plt.pie(
             counts_array,
             labels=class_names,
@@ -65,8 +68,8 @@ class Plotter:
         plt.show()
         plt.close()
 
-
-    def plot_bar(self, counts: Dict[str, int], title: str, save_to: Optional[str] = None) -> None:
+    def plot_bar(self, counts: Dict[str, int], title: str,
+                 save_to: Optional[str] = None) -> None:
         """
         Plot class distribution as a bar chart.
 
@@ -80,7 +83,9 @@ class Plotter:
         :rtype: None
         """
         counts_array = [value for key, value in counts.items()]
-        self.logger.info(f"Number of elements to classify: {sum([v for k, v in counts.items()])}")
+        self.logger.info(
+            f"Number of elements to classify: "
+            f"{sum([v for k, v in counts.items()])}")
         self.logger.info(f"Number of classes to plot : {len(counts_array)}")
         class_names = list(counts.keys())
         for k, v in counts.items():
@@ -99,7 +104,11 @@ class Plotter:
         plt.show()
         plt.close()
 
-    def plot_both(self, counts: Dict[str, int], title: str, save_to: Optional[str] = None) -> None:
+    def plot_both(self,
+                  counts: Dict[str,
+                               int],
+                  title: str,
+                  save_to: Optional[str] = None) -> None:
         """
         Plot class distribution as both pie and bar charts side by side.
 
@@ -114,12 +123,13 @@ class Plotter:
         """
         counts_array = list(counts.values())
         class_names = list(counts.keys())
-        self.logger.info(f"Number of elements to classify: {sum([v for k, v in counts.items()])}")
+        self.logger.info(
+            f"Number of elements to classify: "
+            f"{sum([v for k, v in counts.items()])}")
         self.logger.info(f"Number of classes to plot : {len(counts_array)}")
         for k, v in counts.items():
             self.logger.info(f"{k}:{v}")
 
-    
         plt.suptitle(title)
 
         plt.subplot(1, 2, 1)
@@ -149,7 +159,8 @@ class Plotter:
         plt.show()
         plt.close()
 
-    def plot_learning_curve(self, train : Dict[int, int], valid : Dict[int, int]):
+    def plot_learning_curve(
+            self, train: Dict[int, int], valid: Dict[int, int]):
         """
         Plot training and validation accuracy curves.
 
@@ -160,14 +171,13 @@ class Plotter:
         :return: None
         :rtype: None
         """
-        
+
         x_train = [epoch for epoch, acc in train.items()]
         y_train = [acc for epoch, acc in train.items()]
 
         x_valid = [epoch for epoch, acc in valid.items()]
         y_valid = [acc for epoch, acc in valid.items()]
 
-        
         plt.plot(x_train, y_train, label="train curve")
         plt.plot(x_valid, y_valid, label="valid curve")
 
@@ -177,7 +187,7 @@ class Plotter:
         plt.savefig("./learning curve.jpg")
         plt.close()
 
-    def plot_learning_curve_loss(self, loss : Dict[int,int]):
+    def plot_learning_curve_loss(self, loss: Dict[int, int]):
         """
         Plot training loss curve.
 
@@ -189,18 +199,18 @@ class Plotter:
         x_loss = [epoch for epoch, acc in loss.items()]
         y_loss = [acc for epoch, acc in loss.items()]
 
-        
         plt.plot(x_loss, y_loss, label="train curve loss")
 
         plt.legend()
         plt.xlabel("Epoch")
         plt.ylabel("loss")
         plt.savefig("./learning curve_loss.jpg")
-        plt.close()        
+        plt.close()
 
     def _imshow_safe(self, img: np.ndarray) -> None:
         """
-        Safely display an image handling different formats (grayscale, RGB, RGBA).
+        Safely display an image handling different formats
+        (grayscale, RGB, RGBA).
 
         :param img: Image array to display.
         :type img: np.ndarray
@@ -253,11 +263,11 @@ class Plotter:
         nb_images = len(images)
         if original is not None:
             nb_images += 1
-        
+
         rows = ceil(nb_images / max_cols)
-        
+
         plot_idx = 1
-        
+
         if original is not None:
             plt.subplot(rows, max_cols, plot_idx)
             plt.axis('off')
@@ -274,11 +284,9 @@ class Plotter:
 
         if save_to is not None:
             plt.savefig(save_to)
-        
+
         plt.show()
         plt.close()
-
-
 
 
 def main():
@@ -289,14 +297,14 @@ def main():
     :rtype: None
     """
     counts = {
-        "Apple Healthy" : 1600,
-        "Apple Black Rot" : 800,
-        "Apple Rust" : 400,
-        "Apple Scab" : 600,
-        "Grape Black Rot" : 500,
-        "Grape Esca" : 1500,
-        "Grape Healthy" : 400,
-        "Grape Spot" : 700
+        "Apple Healthy": 1600,
+        "Apple Black Rot": 800,
+        "Apple Rust": 400,
+        "Apple Scab": 600,
+        "Grape Black Rot": 500,
+        "Grape Esca": 1500,
+        "Grape Healthy": 400,
+        "Grape Spot": 700
     }
 
     title = "Fruits graph"
@@ -308,8 +316,6 @@ def main():
     distribution.plot_pie(counts, title, save_to)
     distribution.plot_bar(counts, title, save_to)
     distribution.plot_both(counts, title, save_to)
-
-
 
 
 if __name__ == "__main__":

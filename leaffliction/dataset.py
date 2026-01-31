@@ -1,8 +1,3 @@
-"""Dataset scanning, indexing, and splitting.
-
-Provides utilities to scan directory-based image datasets, build indices,
-and split data into training and validation sets.
-"""
 from __future__ import annotations
 
 from dataclasses import dataclass

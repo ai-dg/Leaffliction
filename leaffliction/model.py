@@ -17,6 +17,7 @@ from leaffliction.utils import Logger
 import sys
 from leaffliction.transformations import TransformationEngine
 
+
 @dataclass
 class ModelConfig:
     """
@@ -44,7 +45,7 @@ class LabelMapper:
     Maps between class names and numeric IDs for classification.
     """
 
-    def __init__(self, verbose : bool = true) -> None:
+    def __init__(self, verbose: bool = true) -> None:
         """
         Initialize the label mapper.
 
@@ -81,7 +82,9 @@ class LabelMapper:
         :rtype: int
         """
         if class_name not in self.class_to_id:
-            self.logger.error(f"Unknown class_name: {class_name}. Known: {list(self.class_to_id.keys())}")
+            self.logger.error(
+                f"Unknown class_name: {class_name}. "
+                f"Known: {list(self.class_to_id.keys())}")
             sys.exit(1)
         return self.class_to_id[class_name]
 
@@ -95,7 +98,9 @@ class LabelMapper:
         :rtype: str
         """
         if class_id not in self.id_to_class:
-            self.logger.error(f"Unknown class_id: {class_id}. Known: {list(self.id_to_class.keys())}")
+            self.logger.error(
+                f"Unknown class_id: {class_id}. "
+                f"Known: {list(self.id_to_class.keys())}")
             sys.exit(1)
         return self.id_to_class[class_id]
 
@@ -187,6 +192,7 @@ class ConvolutionalNeuralNetwork(nn.Module):
         x = self.classifier(x)
         return x
 
+
 def _set_seed(seed: int) -> None:
     """
     Set random seeds for reproducibility across all libraries.
@@ -215,7 +221,7 @@ class InferenceManager:
         transformation_engine: Optional[TransformationEngine],
         cfg: ModelConfig,
         paths: Optional[ModelPaths] = None,
-        verbose : bool = True
+        verbose: bool = True
     ) -> None:
         """
         Initialize the inference manager.
@@ -240,7 +246,8 @@ class InferenceManager:
         self.transformation_engine = transformation_engine
         self.cfg = cfg
         self.paths = paths or ModelPaths()
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device(
+            'cuda' if torch.cuda.is_available() else 'cpu')
         self.model.to(self.device)
         self.verbose = verbose
         self.logger = Logger(self.verbose)
@@ -263,18 +270,24 @@ class InferenceManager:
             "seed": self.cfg.seed,
             "extra": self.cfg.extra,
         }
-        (out_dir / self.paths.config_file).write_text(json.dumps(cfg_dict, indent=2), encoding="utf-8")
+        (out_dir / self.paths.config_file).write_text(
+            json.dumps(cfg_dict, indent=2),
+            encoding="utf-8")
 
-        (out_dir / self.paths.labels_file).write_text(
-            json.dumps(self.labels.to_json_dict(), indent=2, ensure_ascii=False),
-            encoding="utf-8"
-        )
+        (
+            out_dir /
+            self.paths.labels_file).write_text(
+            json.dumps(
+                self.labels.to_json_dict(),
+                indent=2,
+                ensure_ascii=False),
+            encoding="utf-8")
 
         model_path = out_dir / self.paths.model_file
         torch.save(self.model.state_dict(), model_path)
 
     @classmethod
-    def load(cls, in_dir: Path, verbose : bool = True) -> "InferenceManager":
+    def load(cls, in_dir: Path, verbose: bool = True) -> "InferenceManager":
         """
         Load a model from a directory.
 
@@ -296,15 +309,14 @@ class InferenceManager:
         if not cfg_path.exists():
             logger.error(f"Missing config file: {cfg_path}")
             sys.exit(1)
-            
+
         if not labels_path.exists():
             logger.error(f"Missing labels file: {labels_path}")
             sys.exit(1)
-            
+
         if not model_path.exists():
             logger.error(f"Missing model file: {model_path}")
             sys.exit(1)
-            
 
         cfg_data = json.loads(cfg_path.read_text(encoding="utf-8"))
         cfg = ModelConfig(
@@ -319,7 +331,6 @@ class InferenceManager:
         labels_data = json.loads(labels_path.read_text(encoding="utf-8"))
         labels = LabelMapper.from_json_dict(labels_data)
 
-
         model = model = ConvolutionalNeuralNetwork(
             num_classes=cfg.num_classes,
             input_channels=cfg.input_channels
@@ -331,17 +342,28 @@ class InferenceManager:
         model.to(device)
         model.eval()
 
-        bundle = cls(model=model, labels=labels, transformation_engine=None, cfg=cfg, paths=paths, verbose=verbose)
+        bundle = cls(
+            model=model,
+            labels=labels,
+            transformation_engine=None,
+            cfg=cfg,
+            paths=paths,
+            verbose=verbose)
         return bundle
 
     @classmethod
-    def load_from_zip(cls, zip_path: Path, extract_dir: Optional[Path] = None, verbose : bool = True) -> InferenceManager:
+    def load_from_zip(
+            cls,
+            zip_path: Path,
+            extract_dir: Optional[Path] = None,
+            verbose: bool = True) -> InferenceManager:
         """
         Load a model from a ZIP archive.
 
         :param zip_path: Path to the ZIP file containing model artifacts.
         :type zip_path: Path
-        :param extract_dir: Optional directory for extraction (uses temp if None).
+        :param extract_dir: Optional directory for extraction (uses temp
+            if None).
         :type extract_dir: Optional[Path]
         :param verbose: Enable detailed logging.
         :type verbose: bool
@@ -359,7 +381,8 @@ class InferenceManager:
         def find_root(root: Path) -> Path:
             hits = list(root.rglob(paths.config_file))
             if not hits:
-                logger.error(f"Missing config file inside zip extraction: {root}")
+                logger.error(
+                    f"Missing config file inside zip extraction: {root}")
                 sys.exit(1)
             return hits[0].parent
 
@@ -378,12 +401,12 @@ class InferenceManager:
                 zf.extractall(extract_dir)
             return cls.load(find_root(extract_dir), verbose=verbose)
 
-
     def predict(self, tensor: torch.Tensor):
         """
         Perform inference on an input tensor.
 
-        :param tensor: Input tensor of shape (channels, height, width) or (batch, channels, height, width).
+        :param tensor: Input tensor of shape (channels, height, width) or
+            (batch, channels, height, width).
         :type tensor: torch.Tensor
         :return: Tuple of (predicted_class_id, probability_dict).
         :rtype: Tuple[int, Dict[str, float]]
@@ -397,7 +420,9 @@ class InferenceManager:
 
         got_c = int(tensor.size(1))
         if got_c != expected_c:
-            self.logger.error(f"Channel mismatch: model expects C={expected_c} but got C={got_c}. ")
+            self.logger.error(
+                f"Channel mismatch: model expects C={expected_c} "
+                f"but got C={got_c}. ")
             sys.exit(1)
 
         tensor = tensor.to(self.device)
@@ -408,7 +433,9 @@ class InferenceManager:
             pred_id = torch.argmax(probs_tensor, dim=1).item()
 
             probs_np = probs_tensor.detach().cpu().numpy()[0]
-            probs = {self.labels.decode(i): float(probs_np[i]) for i in range(len(probs_np))}
-        
-        return pred_id, probs
+            probs = {
+                self.labels.decode(i): float(
+                    probs_np[i]) for i in range(
+                    len(probs_np))}
 
+        return pred_id, probs

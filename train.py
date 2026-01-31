@@ -12,7 +12,12 @@ from leaffliction.dataset import DatasetScanner, DatasetSplitter
 from leaffliction.augmentations import AugmentationEngine
 from leaffliction.transformations import TransformationEngine
 from leaffliction.model import LabelMapper
-from leaffliction.train_pipeline import Trainer, TrainConfig, ModelChecker, TrainingPackager
+from leaffliction.train_pipeline import (
+    Trainer,
+    TrainConfig,
+    ModelChecker,
+    TrainingPackager
+)
 from leaffliction.utils import ZipPackager, Hasher, Logger
 from leaffliction.plotting import Plotter
 
@@ -20,7 +25,7 @@ from leaffliction.plotting import Plotter
 def main() -> None:
     """
     Train a model from the command-line.
-    
+
     Parses CLI arguments, prepares dataset, trains the model, plots metrics,
     checks model validity, packages artifacts into a ZIP and writes a SHA1
     signature file.
@@ -57,24 +62,28 @@ def main() -> None:
         verbose=args.verbose
     )
 
-
     logger = Logger(args.verbose)
     logger.info("Training information:")
     logger.info(f"   Dataset: {dataset_dir}")
-    logger.info(f"   Augmentation: {'Enabled' if cfg.augment_train else 'Disabled'}")
+    aug_status = 'Enabled' if cfg.augment_train else 'Disabled'
+    logger.info(f"   Augmentation: {aug_status}")
     logger.info(f"   Validation ratio: {cfg.valid_ratio:.0%}")
     logger.info(f"   Epochs: {cfg.epochs}")
     logger.info(f"   Batch size: {cfg.batch_size}")
 
     metrics = trainer.train(dataset_dir=dataset_dir, out_dir=out_dir, cfg=cfg)
     plotter = Plotter()
-    plotter.plot_learning_curve(metrics.history_train_acc, metrics.history_valid_acc)
+    plotter.plot_learning_curve(
+        metrics.history_train_acc,
+        metrics.history_valid_acc)
     plotter.plot_learning_curve_loss(metrics.history_train_loss)
 
     checker = ModelChecker(verbose=args.verbose)
     checker.assert_ok(metrics)
 
-    packager = TrainingPackager(zip_packager=ZipPackager(), verbose=args.verbose)
+    packager = TrainingPackager(
+        zip_packager=ZipPackager(),
+        verbose=args.verbose)
     artifacts_dir = packager.prepare_artifacts_dir(tmp_dir=out_dir)
     packager.build_zip(artifacts_dir=artifacts_dir, out_zip=out_zip)
 

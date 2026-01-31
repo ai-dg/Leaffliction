@@ -1,9 +1,3 @@
-"""
-Utility classes for common operations across the pipeline.
-
-Provides path management (creation, iteration, mirroring), file hashing (SHA1),
-ZIP compression, and colored terminal logging.
-"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -61,7 +55,7 @@ class PathManager:
             src_path: Path,
             src_root: Path,
             target_root: Path
-            ) -> Path:
+    ) -> Path:
         """
         Given a source file, a source root, and a target root, returns the
         mirror path of the source file respect to the target root.
@@ -81,7 +75,7 @@ class PathManager:
             self,
             root: Path,
             recursive: bool = False
-            ) -> List[Path]:
+    ) -> List[Path]:
         """
         List images in the given directory (recursive option).
 
@@ -106,7 +100,7 @@ class Hasher:
             self,
             path: Path,
             chunk_size: int = 1024 * 1024
-            ) -> str:
+    ) -> str:
         """
         Returns the SHA1 hex of a path.
 
@@ -146,12 +140,13 @@ class ZipPackager:
         if src_dir.resolve() in out_zip.resolve().parents:
             raise ValueError(
                 "Destination path can't be inside the source path."
-                )
+            )
         shutil.make_archive(
             base_name=str(out_zip.with_suffix('')),
             format='zip',
             root_dir=src_dir
         )
+
 
 class Logger:
     """
