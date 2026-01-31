@@ -18,19 +18,16 @@ def main() -> None:
 
     bundle_zip: Path | None = args.bundle_zip
     model_path: Path | None = args.model_path
-    image_path: Path = args.image_path  # required=True
+    image_path: Path = args.image_path
 
-    # ❌ Aucun modèle fourni
     if bundle_zip is None and model_path is None:
         print("Error: you must provide either --bundle-zip or --model-path")
         sys.exit(1)
 
-    # ❌ Les deux à la fois
     if bundle_zip is not None and model_path is not None:
         print("Error: choose ONE method between --bundle-zip OR --model-path")
         sys.exit(1)
 
-    # ❌ Chemins invalides
     if bundle_zip is not None and not bundle_zip.exists():
         print(f"Error: bundle zip not found: {bundle_zip}")
         sys.exit(1)

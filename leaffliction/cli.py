@@ -75,44 +75,9 @@ class ArgsManager:
         )
 
         parser.add_argument(
-            "--show",
-            action="store_true",
-            help="Display augmented images"
-        )
-
-        parser.add_argument(
-            "--display",
-            choices=["full", "one"],
-            default="full",
-            help="Display mode: show all augmentations at once (full) or one-by-one (one)"
-        )
-
-        parser.add_argument(
-            "--formats",
-            nargs="+",
-            choices=["jpg", "jpeg", "png"],
-            default=["jpg"],
-            help="Accepted image extensions"
-        )
-
-        parser.add_argument(
             "--verbose",
             action="store_true",
             help="Display detailed processing information"
-        )
-
-        parser.add_argument(
-            "--seed",
-            type=int,
-            default=None,
-            help="Random seed for reproducible augmentations"
-        )
-
-        parser.add_argument(
-            "--only",
-            nargs="+",
-            choices=["flip", "rotate", "skew", "shear", "crop", "distortion"],
-            help="Apply only the selected augmentations (default: all)"
         )
 
         return parser
@@ -149,23 +114,9 @@ class ArgsManager:
         )
 
         parser.add_argument(
-            "--histogram",
-            action="store_true",
-            help="Display color histogram"
-        )
-
-        parser.add_argument(
-            "--formats",
-            nargs="+",
-            choices=["jpg", "jpeg", "png"],
-            default=["jpg"],
-            help="Accepted image extensions (batch mode)"
-        )
-
-        parser.add_argument(
             "--only",
             nargs="+",
-            choices=["blur", "mask", "roi", "analyze", "pseudo"],
+            choices=["grayscale", "gaussian", "mask", "hue", "roi", "analyze", "pseudo"],
             help="Apply only the selected transformations (default: all)"
         )
 

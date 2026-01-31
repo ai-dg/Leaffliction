@@ -9,6 +9,7 @@ import numpy as np
 from math import ceil
 import cv2
 from leaffliction.utils import Logger
+from plantcv import plantcv as pcv
 
 
 class Plotter:
@@ -17,16 +18,16 @@ class Plotter:
     """
     def __init__(self, verbose : bool = True):
         self.verbose = verbose
+        self.logger = Logger(self.verbose)
 
     def plot_pie(self, counts: Dict[str, int], title: str, save_to: Optional[str] = None) -> None:
-        vprint = Logger(self.verbose)
         counts_array = [value for key, value in counts.items()]
 
-        vprint.info(f"Number of elements to classify: {sum([v for k, v in counts.items()])}")
-        vprint.info(f"Number of classes to plot : {len(counts_array)}")
-        class_names = list(counts.keys())
+        self.logger.info(f"Number of elements to classify: {sum([v for k, v in counts.items()])}")
+        self.logger.info(f"Number of classes to plot : {len(counts_array)}")
+        self.class_names = list(counts.keys())
         for k, v in counts.items():
-            vprint.info(f"{k}:{v}")
+            self.logger.info(f"{k}:{v}")
 
         plt.figure()
         plt.pie(
@@ -45,15 +46,13 @@ class Plotter:
         plt.close()
 
 
-
     def plot_bar(self, counts: Dict[str, int], title: str, save_to: Optional[str] = None) -> None:
-        vprint = Logger(self.verbose)
         counts_array = [value for key, value in counts.items()]
-        vprint.info(f"Number of elements to classify: {sum([v for k, v in counts.items()])}")
-        vprint.info(f"Number of classes to plot : {len(counts_array)}")
+        self.logger.info(f"Number of elements to classify: {sum([v for k, v in counts.items()])}")
+        self.logger.info(f"Number of classes to plot : {len(counts_array)}")
         class_names = list(counts.keys())
         for k, v in counts.items():
-            vprint.info(f"{k}:{v}")
+            self.logger.info(f"{k}:{v}")
 
         plt.figure(figsize=(12, 17))
         plt.bar(class_names, counts_array)
@@ -71,6 +70,10 @@ class Plotter:
     def plot_both(self, counts: Dict[str, int], title: str, save_to: Optional[str] = None) -> None:
         counts_array = list(counts.values())
         class_names = list(counts.keys())
+        self.logger.info(f"Number of elements to classify: {sum([v for k, v in counts.items()])}")
+        self.logger.info(f"Number of classes to plot : {len(counts_array)}")
+        for k, v in counts.items():
+            self.logger.info(f"{k}:{v}")
 
     
         plt.suptitle(title)
@@ -188,6 +191,8 @@ class Plotter:
         
         plt.show()
         plt.close()
+
+
 
 
 def main():

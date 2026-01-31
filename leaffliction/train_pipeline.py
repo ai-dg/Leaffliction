@@ -9,6 +9,7 @@ from torch.utils.data import TensorDataset, DataLoader
 
 from Transformation import TransformationDirectory
 import sys
+import shutil
 from typing import Optional
 from leaffliction.model import ModelConfig
 from leaffliction.model import ConvolutionalNeuralNetwork
@@ -334,7 +335,7 @@ class TrainingPackager:
         Prépare le dossier d'artefacts à zipper.
         Pour PyTorch: model/
         """
-        import shutil
+        
 
         artifacts_dir = tmp_dir / "artifacts"
         artifacts_dir.mkdir(parents=True, exist_ok=True)

@@ -7,7 +7,7 @@ from leaffliction.cli import ArgsManager
 from leaffliction.utils import PathManager
 from leaffliction.augmentations import AugmentationEngine, AugmentationSaver
 from leaffliction.plotting import Plotter
-
+from leaffliction.utils import Logger
 
 def main() -> None:
     parser = ArgsManager().build_augmentation_parser()
@@ -15,17 +15,19 @@ def main() -> None:
 
     output_dir = Path(args.output_dir)
     image_path = Path(args.image_path)
+    logger = Logger(args.verbose)
+    
 
     img = cv2.imread(str(image_path))
     if img is None:
-        print(f"Error: Could not load image from {image_path}")
+        logger.error(f"Error: Could not load image from {image_path}")
         return
     
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
     engine = AugmentationEngine()
     
-    results = engine.apply_all(img)
+    results = engine.apply_all_script(img)
 
     grid = Plotter()
     grid.plot_grid("Augmentations", results, original=img)
@@ -34,9 +36,9 @@ def main() -> None:
     saver = AugmentationSaver(pm)
     saved_paths = saver.save_all(image_path, output_dir, results)
     
-    print(f"\n✅ Augmentations saved:")
+    logger.info("Augmentations saved:")
     for path in saved_paths:
-        print(f"   - {path.name}")
+        logger.info(f"   - {path.parent}/{path.name}")
 
 
 if __name__ == "__main__":
