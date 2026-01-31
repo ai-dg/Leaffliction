@@ -154,21 +154,56 @@ class ZipPackager:
         )
 
 class Logger:
+    """
+    Colored console logger for informational, warning, and error messages.
+    """
     RESET = "\033[0m"
     BLUE = "\033[94m"
     YELLOW = "\033[93m"
     RED = "\033[91m"
 
     def __init__(self, verbose: bool = True):
+        """
+        Initialize the logger.
+
+        :param verbose: Enable verbose output.
+        :type verbose: bool
+        :return: None
+        :rtype: None
+        """
         self.verbose = verbose
 
     def info(self, *args, **kwargs):
+        """
+        Print an informational message in blue.
+
+        :param args: Positional arguments to print.
+        :param kwargs: Keyword arguments for print function.
+        :return: None
+        :rtype: None
+        """
         if self.verbose:
             print(f"{self.BLUE}[INFO]{self.RESET}", *args, **kwargs)
 
     def warn(self, *args, **kwargs):
+        """
+        Print a warning message in yellow.
+
+        :param args: Positional arguments to print.
+        :param kwargs: Keyword arguments for print function.
+        :return: None
+        :rtype: None
+        """
         if self.verbose:
             print(f"{self.YELLOW}[WARN]{self.RESET}", *args, **kwargs)
 
     def error(self, *args, **kwargs):
+        """
+        Print an error message in red (always displayed).
+
+        :param args: Positional arguments to print.
+        :param kwargs: Keyword arguments for print function.
+        :return: None
+        :rtype: None
+        """
         print(f"{self.RED}[ERROR]{self.RESET}", *args, **kwargs)

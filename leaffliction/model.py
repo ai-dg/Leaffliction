@@ -19,6 +19,9 @@ from leaffliction.transformations import TransformationEngine
 
 @dataclass
 class ModelConfig:
+    """
+    Configuration parameters for the neural network model.
+    """
     num_classes: int = 0
     input_channels: int = 4
     img_size: Tuple[int, int] = (224, 224)
@@ -28,40 +31,93 @@ class ModelConfig:
 
 @dataclass
 class ModelPaths:
+    """
+    File paths for model artifacts (weights, labels, config).
+    """
     model_file: str = "model.pth"
     labels_file: str = "labels.json"
     config_file: str = "config.json"
 
 
 class LabelMapper:
+    """
+    Maps between class names and numeric IDs for classification.
+    """
+
     def __init__(self, verbose : bool = true) -> None:
+        """
+        Initialize the label mapper.
+
+        :param verbose: Enable detailed logging output.
+        :type verbose: bool
+        :return: None
+        :rtype: None
+        """
         self.class_to_id: Dict[str, int] = {}
         self.id_to_class: Dict[int, str] = {}
         self.verbose = verbose
         self.logger = Logger(verbose)
 
     def fit(self, class_names: List[str]) -> None:
+        """
+        Build the mapping from a list of class names.
+
+        :param class_names: List of class name strings.
+        :type class_names: List[str]
+        :return: None
+        :rtype: None
+        """
         uniq = sorted(set(class_names))
         self.class_to_id = {name: i for i, name in enumerate(uniq)}
         self.id_to_class = {i: name for name, i in self.class_to_id.items()}
 
     def encode(self, class_name: str) -> int:
+        """
+        Convert a class name to its numeric ID.
+
+        :param class_name: Name of the class to encode.
+        :type class_name: str
+        :return: Numeric class ID.
+        :rtype: int
+        """
         if class_name not in self.class_to_id:
             self.logger.error(f"Unknown class_name: {class_name}. Known: {list(self.class_to_id.keys())}")
             sys.exit(1)
         return self.class_to_id[class_name]
 
     def decode(self, class_id: int) -> str:
+        """
+        Convert a numeric ID back to its class name.
+
+        :param class_id: Numeric class ID to decode.
+        :type class_id: int
+        :return: Class name string.
+        :rtype: str
+        """
         if class_id not in self.id_to_class:
             self.logger.error(f"Unknown class_id: {class_id}. Known: {list(self.id_to_class.keys())}")
             sys.exit(1)
         return self.id_to_class[class_id]
 
     def to_json_dict(self) -> Dict[str, Any]:
+        """
+        Export the mapping to a JSON-serializable dictionary.
+
+        :return: Dictionary containing class-to-ID mapping.
+        :rtype: Dict[str, Any]
+        """
         return {"class_to_id": self.class_to_id}
 
     @classmethod
     def from_json_dict(cls, data: Dict[str, Any]) -> "LabelMapper":
+        """
+        Create a LabelMapper from a JSON dictionary.
+
+        :param data: Dictionary containing class-to-ID mapping.
+        :type data: Dict[str, Any]
+        :return: Initialized LabelMapper instance.
+        :rtype: LabelMapper
+        """
         enc = cls()
         c2i = data.get("class_to_id", {})
         if not isinstance(c2i, dict):
@@ -72,7 +128,21 @@ class LabelMapper:
 
 
 class ConvolutionalNeuralNetwork(nn.Module):
+    """
+    Custom CNN architecture for plant disease classification.
+    """
+
     def __init__(self, num_classes: int, input_channels: int = 6):
+        """
+        Initialize the CNN with specified architecture.
+
+        :param num_classes: Number of output classes.
+        :type num_classes: int
+        :param input_channels: Number of input channels (default: 6).
+        :type input_channels: int
+        :return: None
+        :rtype: None
+        """
         super().__init__()
 
         self.features = nn.Sequential(
@@ -104,12 +174,28 @@ class ConvolutionalNeuralNetwork(nn.Module):
         )
 
     def forward(self, x):
+        """
+        Forward pass through the network.
+
+        :param x: Input tensor of shape (batch, channels, height, width).
+        :type x: torch.Tensor
+        :return: Output logits of shape (batch, num_classes).
+        :rtype: torch.Tensor
+        """
         x = self.features(x)
         x = self.gap(x)
         x = self.classifier(x)
         return x
 
 def _set_seed(seed: int) -> None:
+    """
+    Set random seeds for reproducibility across all libraries.
+
+    :param seed: Random seed value.
+    :type seed: int
+    :return: None
+    :rtype: None
+    """
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -118,6 +204,10 @@ def _set_seed(seed: int) -> None:
 
 
 class InferenceManager:
+    """
+    Manages model loading, saving, and inference operations.
+    """
+
     def __init__(
         self,
         model: ConvolutionalNeuralNetwork,
@@ -127,6 +217,24 @@ class InferenceManager:
         paths: Optional[ModelPaths] = None,
         verbose : bool = True
     ) -> None:
+        """
+        Initialize the inference manager.
+
+        :param model: The neural network model.
+        :type model: ConvolutionalNeuralNetwork
+        :param labels: Label mapper for class encoding/decoding.
+        :type labels: LabelMapper
+        :param transformation_engine: Engine for image transformations.
+        :type transformation_engine: Optional[TransformationEngine]
+        :param cfg: Model configuration.
+        :type cfg: ModelConfig
+        :param paths: File paths for model artifacts.
+        :type paths: Optional[ModelPaths]
+        :param verbose: Enable detailed logging.
+        :type verbose: bool
+        :return: None
+        :rtype: None
+        """
         self.model = model
         self.labels = labels
         self.transformation_engine = transformation_engine
@@ -138,6 +246,14 @@ class InferenceManager:
         self.logger = Logger(self.verbose)
 
     def save(self, out_dir: Path) -> None:
+        """
+        Save model, config, and labels to disk.
+
+        :param out_dir: Output directory for model artifacts.
+        :type out_dir: Path
+        :return: None
+        :rtype: None
+        """
         out_dir.mkdir(parents=True, exist_ok=True)
 
         cfg_dict = {
@@ -159,6 +275,16 @@ class InferenceManager:
 
     @classmethod
     def load(cls, in_dir: Path, verbose : bool = True) -> "InferenceManager":
+        """
+        Load a model from a directory.
+
+        :param in_dir: Directory containing model artifacts.
+        :type in_dir: Path
+        :param verbose: Enable detailed logging.
+        :type verbose: bool
+        :return: Loaded InferenceManager instance.
+        :rtype: InferenceManager
+        """
         in_dir = Path(in_dir)
         paths = ModelPaths()
         logger = Logger(verbose=verbose)
@@ -210,6 +336,18 @@ class InferenceManager:
 
     @classmethod
     def load_from_zip(cls, zip_path: Path, extract_dir: Optional[Path] = None, verbose : bool = True) -> InferenceManager:
+        """
+        Load a model from a ZIP archive.
+
+        :param zip_path: Path to the ZIP file containing model artifacts.
+        :type zip_path: Path
+        :param extract_dir: Optional directory for extraction (uses temp if None).
+        :type extract_dir: Optional[Path]
+        :param verbose: Enable detailed logging.
+        :type verbose: bool
+        :return: Loaded InferenceManager instance.
+        :rtype: InferenceManager
+        """
         zip_path = Path(zip_path)
         logger = Logger(verbose)
         if not zip_path.exists():
@@ -242,6 +380,14 @@ class InferenceManager:
 
 
     def predict(self, tensor: torch.Tensor):
+        """
+        Perform inference on an input tensor.
+
+        :param tensor: Input tensor of shape (channels, height, width) or (batch, channels, height, width).
+        :type tensor: torch.Tensor
+        :return: Tuple of (predicted_class_id, probability_dict).
+        :rtype: Tuple[int, Dict[str, float]]
+        """
         self.model.eval()
 
         if tensor.dim() == 3:

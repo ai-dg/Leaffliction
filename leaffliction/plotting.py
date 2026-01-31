@@ -14,13 +14,33 @@ from plantcv import plantcv as pcv
 
 class Plotter:
     """
-    Pie chart + bar chart pour la distribution des classes.
+    Visualization utility for dataset distribution and training metrics.
     """
     def __init__(self, verbose : bool = True):
+        """
+        Initialize the plotter.
+
+        :param verbose: Enable detailed logging.
+        :type verbose: bool
+        :return: None
+        :rtype: None
+        """
         self.verbose = verbose
         self.logger = Logger(self.verbose)
 
     def plot_pie(self, counts: Dict[str, int], title: str, save_to: Optional[str] = None) -> None:
+        """
+        Plot class distribution as a pie chart.
+
+        :param counts: Dictionary mapping class names to counts.
+        :type counts: Dict[str, int]
+        :param title: Chart title.
+        :type title: str
+        :param save_to: Optional path to save the figure.
+        :type save_to: Optional[str]
+        :return: None
+        :rtype: None
+        """
         counts_array = [value for key, value in counts.items()]
 
         self.logger.info(f"Number of elements to classify: {sum([v for k, v in counts.items()])}")
@@ -47,6 +67,18 @@ class Plotter:
 
 
     def plot_bar(self, counts: Dict[str, int], title: str, save_to: Optional[str] = None) -> None:
+        """
+        Plot class distribution as a bar chart.
+
+        :param counts: Dictionary mapping class names to counts.
+        :type counts: Dict[str, int]
+        :param title: Chart title.
+        :type title: str
+        :param save_to: Optional path to save the figure.
+        :type save_to: Optional[str]
+        :return: None
+        :rtype: None
+        """
         counts_array = [value for key, value in counts.items()]
         self.logger.info(f"Number of elements to classify: {sum([v for k, v in counts.items()])}")
         self.logger.info(f"Number of classes to plot : {len(counts_array)}")
@@ -68,6 +100,18 @@ class Plotter:
         plt.close()
 
     def plot_both(self, counts: Dict[str, int], title: str, save_to: Optional[str] = None) -> None:
+        """
+        Plot class distribution as both pie and bar charts side by side.
+
+        :param counts: Dictionary mapping class names to counts.
+        :type counts: Dict[str, int]
+        :param title: Chart title.
+        :type title: str
+        :param save_to: Optional path to save the figure.
+        :type save_to: Optional[str]
+        :return: None
+        :rtype: None
+        """
         counts_array = list(counts.values())
         class_names = list(counts.keys())
         self.logger.info(f"Number of elements to classify: {sum([v for k, v in counts.items()])}")
@@ -106,6 +150,16 @@ class Plotter:
         plt.close()
 
     def plot_learning_curve(self, train : Dict[int, int], valid : Dict[int, int]):
+        """
+        Plot training and validation accuracy curves.
+
+        :param train: Dictionary mapping epochs to training accuracy.
+        :type train: Dict[int, int]
+        :param valid: Dictionary mapping epochs to validation accuracy.
+        :type valid: Dict[int, int]
+        :return: None
+        :rtype: None
+        """
         
         x_train = [epoch for epoch, acc in train.items()]
         y_train = [acc for epoch, acc in train.items()]
@@ -124,6 +178,14 @@ class Plotter:
         plt.close()
 
     def plot_learning_curve_loss(self, loss : Dict[int,int]):
+        """
+        Plot training loss curve.
+
+        :param loss: Dictionary mapping epochs to training loss.
+        :type loss: Dict[int, int]
+        :return: None
+        :rtype: None
+        """
         x_loss = [epoch for epoch, acc in loss.items()]
         y_loss = [acc for epoch, acc in loss.items()]
 
@@ -137,6 +199,14 @@ class Plotter:
         plt.close()        
 
     def _imshow_safe(self, img: np.ndarray) -> None:
+        """
+        Safely display an image handling different formats (grayscale, RGB, RGBA).
+
+        :param img: Image array to display.
+        :type img: np.ndarray
+        :return: None
+        :rtype: None
+        """
         if img.ndim == 2:
             plt.imshow(img, cmap="gray", vmin=0, vmax=255)
             return
@@ -161,6 +231,22 @@ class Plotter:
         save_to: Optional[Path] = None,
         max_cols: int = 3
     ) -> None:
+        """
+        Display multiple images in a grid layout.
+
+        :param title: Grid title.
+        :type title: str
+        :param images: Dictionary mapping image names to arrays.
+        :type images: Dict[str, np.ndarray]
+        :param original: Optional original image to display first.
+        :type original: Optional[np.ndarray]
+        :param save_to: Optional path to save the figure.
+        :type save_to: Optional[Path]
+        :param max_cols: Maximum number of columns in the grid.
+        :type max_cols: int
+        :return: None
+        :rtype: None
+        """
 
         plt.suptitle(title)
 
@@ -196,6 +282,12 @@ class Plotter:
 
 
 def main():
+    """
+    Example usage of the Plotter class.
+
+    :return: None
+    :rtype: None
+    """
     counts = {
         "Apple Healthy" : 1600,
         "Apple Black Rot" : 800,

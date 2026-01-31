@@ -8,6 +8,15 @@ from leaffliction.plotting import Plotter
 
 
 def main() -> None:
+    """
+    Analyze and visualize dataset class distribution.
+
+    Scans the dataset directory, counts images per class, and displays
+    distribution charts (pie, bar, or both) based on user selection.
+
+    :return: None
+    :rtype: None
+    """
     parser = ArgsManager().build_distribution_parser()
     args = parser.parse_args()
 

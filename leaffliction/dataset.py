@@ -31,12 +31,22 @@ class DatasetIndex:
 
     @property
     def num_classes(self) -> int:
-        """Number of distinct classes in the dataset."""
+        """
+        Number of distinct classes in the dataset.
+
+        :return: Number of classes.
+        :rtype: int
+        """
         return len(self.class_names)
 
     @property
     def size(self) -> int:
-        """Total number of items in the dataset."""
+        """
+        Total number of items in the dataset.
+
+        :return: Total number of images.
+        :rtype: int
+        """
         return len(self.items)
 
 

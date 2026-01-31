@@ -5,6 +5,10 @@ from pathlib import Path
 
 
 class ArgsManager:
+    """
+    Manages command-line argument parsers for all Leaffliction scripts.
+    """
+
     def build_distribution_parser(self) -> argparse.ArgumentParser:
         """
         Build and configure the argument parser for the Distribution script.
@@ -28,7 +32,7 @@ class ArgsManager:
             help="Directory containing the plant dataset"
         )
 
-        parser.add_argument(
+        parser.add_argument( 
             "--mode",
             choices=["both", "bar", "pie"],
             default="both",
@@ -52,6 +56,15 @@ class ArgsManager:
 
 
     def build_augmentation_parser(self) -> argparse.ArgumentParser:
+        """
+        Build argument parser for the Augmentation script.
+
+        Handles image path input and output directory for augmented images.
+
+        :param self: Instance of the ArgsManager class.
+        :return: Configured argument parser for the Augmentation script.
+        :rtype: argparse.ArgumentParser
+        """
         parser = argparse.ArgumentParser(
             description="Leaffliction - Augmentation script"
         )
@@ -79,6 +92,16 @@ class ArgsManager:
 
 
     def build_transformation_parser(self) -> argparse.ArgumentParser:
+        """
+        Build argument parser for the Transformation script.
+
+        Handles single image or directory transformation with optional
+        transform selection and output directory specification.
+
+        :param self: Instance of the ArgsManager class.
+        :return: Configured argument parser for the Transformation script.
+        :rtype: argparse.ArgumentParser
+        """
         parser = argparse.ArgumentParser(
             description="Leaffliction - Transformation"
         )
@@ -120,6 +143,16 @@ class ArgsManager:
 
 
     def build_train_parser(self) -> argparse.ArgumentParser:
+        """
+        Build argument parser for the Train script.
+
+        Handles dataset directory, training hyperparameters, output paths,
+        and validation configuration for model training.
+
+        :param self: Instance of the ArgsManager class.
+        :return: Configured argument parser for the Train script.
+        :rtype: argparse.ArgumentParser
+        """
         parser = argparse.ArgumentParser(
             description="Leaffliction - Train"
         )
@@ -192,6 +225,16 @@ class ArgsManager:
 
 
     def build_predict_parser(self) -> argparse.ArgumentParser:
+        """
+        Build argument parser for the Predict script.
+
+        Handles image path, model loading options (zip or directory),
+        and prediction display settings.
+
+        :param self: Instance of the ArgsManager class.
+        :return: Configured argument parser for the Predict script.
+        :rtype: argparse.ArgumentParser
+        """
         parser = argparse.ArgumentParser(
             description="Leaffliction - Predict"
         )
@@ -199,7 +242,16 @@ class ArgsManager:
         parser.add_argument(
             "image_path",
             type=Path,
-            help="Path to an input image to classify (e.g., ./Apple/apple_healthy/image (1).JPG)"
+            nargs="?",
+            default=None,
+            help="Path to an input image to classify (optional)"
+        )
+
+        parser.add_argument(
+            "--dir-path",
+            type=Path,
+            default=None,
+            help="Path to load images and calculates the pred."
         )
 
         parser.add_argument(
@@ -215,6 +267,7 @@ class ArgsManager:
             default=None,
             help="Path to the model/artifacts directory (optional; overrides --bundle-zip if provided)."
         )
+
 
         parser.add_argument(
             "--show-transforms",

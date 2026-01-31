@@ -32,6 +32,14 @@ class AugmentationEngine:
     """
 
     def __init__(self, verbose: bool = True):
+        """
+        Initialize the augmentation engine.
+
+        :param verbose: Enable detailed logging.
+        :type verbose: bool
+        :return: None
+        :rtype: None
+        """
         self.verbose = verbose
 
     augs_demo = {
@@ -289,16 +297,14 @@ class AugmentationEngine:
             img_size: Tuple[int, int] = (224, 224)
         ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Charge simplement les images (augmentées ou non) depuis le disque
-        et retourne X, y pour PyTorch, sans transformation.
+        Load augmented images from disk and return as PyTorch tensors.
 
-        Args:
-            items: [(image_path, class_id), ...]
-            img_size: taille de redimensionnement
-
-        Returns:
-            X: torch.Tensor (N, 3, H, W)
-            y: torch.Tensor (N,)
+        :param items: List of (image_path, class_id) tuples.
+        :type items: List[Tuple[Path, int]]
+        :param img_size: Target image size as (height, width).
+        :type img_size: Tuple[int, int]
+        :return: Tuple of (features_tensor, labels_tensor).
+        :rtype: Tuple[torch.Tensor, torch.Tensor]
         """
         X_list = []
         y_list = []
@@ -343,6 +349,14 @@ class AugmentationSaver:
     """
 
     def __init__(self, path_manager: Any) -> None:
+        """
+        Initialize the augmentation saver.
+
+        :param path_manager: Path management utility.
+        :type path_manager: Any
+        :return: None
+        :rtype: None
+        """
         self.path_manager = path_manager
 
     def save_all(

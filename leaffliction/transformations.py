@@ -19,18 +19,42 @@ from leaffliction.plotting import Plotter
 import sys
 
 def _ensure_uint8(img: np.ndarray) -> np.ndarray:
+    """
+    Convert image to uint8 data type if needed.
+
+    :param img: Input image array.
+    :type img: np.ndarray
+    :return: Image as uint8 array.
+    :rtype: np.ndarray
+    """
     if img.dtype != np.uint8:
         img = np.clip(img, 0, 255).astype(np.uint8)
     return img
 
 
 def _to_bgr_if_bgra(img: np.ndarray) -> np.ndarray:
+    """
+    Convert BGRA image to BGR by removing alpha channel.
+
+    :param img: Input image array.
+    :type img: np.ndarray
+    :return: BGR image without alpha channel.
+    :rtype: np.ndarray
+    """
     if img.ndim == 3 and img.shape[2] == 4:
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
     return img
 
 
 def _to_gray_if_color(img: np.ndarray) -> np.ndarray:
+    """
+    Convert color image to grayscale if needed.
+
+    :param img: Input image array.
+    :type img: np.ndarray
+    :return: Grayscale image.
+    :rtype: np.ndarray
+    """
     if img.ndim == 3 and img.shape[2] in (3, 4):
         if img.shape[2] == 4:
             img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
@@ -40,20 +64,59 @@ def _to_gray_if_color(img: np.ndarray) -> np.ndarray:
 
 @dataclass
 class TransformationPipeline:
+    """
+    Pipeline context for applying sequential transformations with caching.
+    """
     img: np.ndarray
     cache: Dict[str, np.ndarray]
 
     def get(self, key: str) -> np.ndarray:
+        """
+        Retrieve a cached transformation result.
+
+        :param key: Cache key name.
+        :type key: str
+        :return: Cached image array.
+        :rtype: np.ndarray
+        """
         return self.cache[key]
 
     def has(self, key: str) -> bool:
+        """
+        Check if a transformation result is cached.
+
+        :param key: Cache key name.
+        :type key: str
+        :return: True if key exists in cache.
+        :rtype: bool
+        """
         return key in self.cache
 
     def set(self, key: str, value: np.ndarray) -> np.ndarray:
+        """
+        Store a transformation result in cache.
+
+        :param key: Cache key name.
+        :type key: str
+        :param value: Image array to cache.
+        :type value: np.ndarray
+        :return: The cached value.
+        :rtype: np.ndarray
+        """
         self.cache[key] = value
         return value
 
     def ensure_base(self, threshold: int = 35, fill_size: int = 200) -> None:
+        """
+        Compute and cache base transformations (background removal, grayscale, etc.).
+
+        :param threshold: Threshold value for binary operations.
+        :type threshold: int
+        :param fill_size: Size parameter for fill operations.
+        :type fill_size: int
+        :return: None
+        :rtype: None
+        """
         if self.has("img_no_bg"):
             return
 
@@ -115,6 +178,12 @@ class TransformationPipeline:
 
 
     def ensure_roi(self) -> None:
+        """
+        Compute and cache region of interest (ROI) transformations.
+
+        :return: None
+        :rtype: None
+        """
         if self.has("roi_image") and self.has("kept_mask"):
             return
 
@@ -162,6 +231,9 @@ class TransformationPipeline:
 
 
 class Transformation(Protocol):
+    """
+    Protocol defining the interface for transformation operations.
+    """
     @property
     def name(self) -> str:
         ...
@@ -173,86 +245,188 @@ class Transformation(Protocol):
 
 @dataclass
 class NoBg:
+    """
+    Transformation that removes image background.
+    """
     name: str = "NoBg"
 
     def apply(self, ctx: TransformationPipeline) -> np.ndarray:
+        """
+        Apply background removal transformation.
+
+        :param ctx: Transformation pipeline context.
+        :type ctx: TransformationPipeline
+        :return: Image with background removed.
+        :rtype: np.ndarray
+        """
         ctx.ensure_base()
         return ctx.get("img_no_bg")
 
 
 @dataclass
 class GrayscaleL:
+    """
+    Transformation that converts image to grayscale using L channel.
+    """
     name: str = "GrayScale"
 
     def apply(self, ctx: TransformationPipeline) -> np.ndarray:
+        """
+        Apply grayscale conversion.
+
+        :param ctx: Transformation pipeline context.
+        :type ctx: TransformationPipeline
+        :return: Grayscale image.
+        :rtype: np.ndarray
+        """
         ctx.ensure_base()
         return ctx.get("grayscale_l")
 
 
 @dataclass
 class Thresh:
+    """
+    Transformation that applies binary thresholding.
+    """
     threshold: int = 35
     fill_size: int = 200
     name: str = "Thresh"
 
     def apply(self, ctx: TransformationPipeline) -> np.ndarray:
+        """
+        Apply binary threshold transformation.
+
+        :param ctx: Transformation pipeline context.
+        :type ctx: TransformationPipeline
+        :return: Thresholded binary image.
+        :rtype: np.ndarray
+        """
         ctx.ensure_base(threshold=self.threshold, fill_size=self.fill_size)
         return ctx.get("thresh")
 
 
 @dataclass
 class Filled:
+    """
+    Transformation that fills small holes in binary mask.
+    """
     threshold: int = 35
     fill_size: int = 200
     name: str = "Filled"
 
     def apply(self, ctx: TransformationPipeline) -> np.ndarray:
+        """
+        Apply hole filling transformation.
+
+        :param ctx: Transformation pipeline context.
+        :type ctx: TransformationPipeline
+        :return: Filled binary mask.
+        :rtype: np.ndarray
+        """
         ctx.ensure_base(threshold=self.threshold, fill_size=self.fill_size)
         return ctx.get("filled")
 
 
 @dataclass
 class GaussianMask:
+    """
+    Transformation that applies Gaussian blur to mask.
+    """
     threshold: int = 35
     fill_size: int = 200
     name: str = "GaussianMask"
 
     def apply(self, ctx: TransformationPipeline) -> np.ndarray:
+        """
+        Apply Gaussian blur to mask.
+
+        :param ctx: Transformation pipeline context.
+        :type ctx: TransformationPipeline
+        :return: Blurred mask.
+        :rtype: np.ndarray
+        """
         ctx.ensure_base(threshold=self.threshold, fill_size=self.fill_size)
         return ctx.get("gaussian")
 
 
 @dataclass
 class Masked:
+    """
+    Transformation that applies mask to isolate leaf region.
+    """
     threshold: int = 35
     fill_size: int = 200
     name: str = "Masked"
 
     def apply(self, ctx: TransformationPipeline) -> np.ndarray:
+        """
+        Apply masking transformation.
+
+        :param ctx: Transformation pipeline context.
+        :type ctx: TransformationPipeline
+        :return: Masked image showing only leaf region.
+        :rtype: np.ndarray
+        """
         ctx.ensure_base(threshold=self.threshold, fill_size=self.fill_size)
         return ctx.get("masked")
 
 @dataclass
 class Hue:
+    """
+    Transformation that extracts hue channel from HSV color space.
+    """
     name: str = "Hue"
 
     def apply(self, ctx: TransformationPipeline) -> np.ndarray:
+        """
+        Extract hue channel.
+
+        :param ctx: Transformation pipeline context.
+        :type ctx: TransformationPipeline
+        :return: Hue channel image.
+        :rtype: np.ndarray
+        """
         ctx.ensure_base()
         return ctx.get("hue")
 
 @dataclass
 class RoiImage:
+    """
+    Transformation that highlights region of interest with bounding box.
+    """
     threshold: int = 35
     fill_size: int = 200
     name: str = "RoiImage"
 
     def apply(self, ctx: TransformationPipeline) -> np.ndarray:
+        """
+        Apply ROI visualization.
+
+        :param ctx: Transformation pipeline context.
+        :type ctx: TransformationPipeline
+        :return: Image with ROI highlighted.
+        :rtype: np.ndarray
+        """
         ctx.ensure_base(threshold=self.threshold, fill_size=self.fill_size)
         ctx.ensure_roi()
         return ctx.get("roi_image")
 
 
 def _draw_pseudolandmarks(image: np.ndarray, pseudolandmarks, color_bgr, radius: int) -> np.ndarray:
+    """
+    Draw pseudolandmark points on an image.
+
+    :param image: Input image array.
+    :type image: np.ndarray
+    :param pseudolandmarks: List of landmark coordinates.
+    :type pseudolandmarks: Any
+    :param color_bgr: Color for drawing landmarks in BGR format.
+    :type color_bgr: tuple
+    :param radius: Radius of landmark circles.
+    :type radius: int
+    :return: Image with landmarks drawn.
+    :rtype: np.ndarray
+    """
     out = image.copy()
     if out.ndim == 3 and out.shape[2] == 4 and len(color_bgr) == 3:
         color = (*color_bgr, 255)
@@ -275,9 +449,20 @@ def _draw_pseudolandmarks(image: np.ndarray, pseudolandmarks, color_bgr, radius:
 
 @dataclass
 class AnalyzeImage:
+    """
+    Transformation that performs morphological analysis on leaf.
+    """
     name: str = "AnalyzeImage"
 
     def apply(self, ctx: TransformationPipeline) -> np.ndarray:
+        """
+        Apply morphological analysis.
+
+        :param ctx: Transformation pipeline context.
+        :type ctx: TransformationPipeline
+        :return: Analyzed image with measurements.
+        :rtype: np.ndarray
+        """
         ctx.ensure_base()
         ctx.ensure_roi()
 
@@ -297,11 +482,22 @@ class AnalyzeImage:
 
 @dataclass
 class PseudoLandmarks:
+    """
+    Transformation that detects and draws pseudolandmarks on leaf.
+    """
     threshold: int = 35
     fill_size: int = 200
     name: str = "PseudoLandmarks"
 
     def apply(self, ctx: TransformationPipeline) -> np.ndarray:
+        """
+        Detect and draw pseudolandmarks.
+
+        :param ctx: Transformation pipeline context.
+        :type ctx: TransformationPipeline
+        :return: Image with pseudolandmarks drawn.
+        :rtype: np.ndarray
+        """
         ctx.ensure_base(threshold=self.threshold, fill_size=self.fill_size)
         ctx.ensure_roi()
 
@@ -325,6 +521,16 @@ class PseudoLandmarks:
 
 
 def _base_stem_and_tf_name(stem: str, tf_names: List[str]) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Extract base filename and transformation name from a stem.
+
+    :param stem: Filename stem to parse.
+    :type stem: str
+    :param tf_names: List of known transformation names.
+    :type tf_names: List[str]
+    :return: Tuple of (base_stem, transformation_name) or (None, None).
+    :rtype: Tuple[Optional[str], Optional[str]]
+    """
     for tf in tf_names:
         suf = "_" + tf
         if stem.endswith(suf):
@@ -334,13 +540,35 @@ def _base_stem_and_tf_name(stem: str, tf_names: List[str]) -> Tuple[Optional[str
 
 
 class TransformationEngine:
+    """
+    Engine for applying multiple transformations to images.
+    """
+
     def __init__(self, tfs: List[Transformation], verbose : bool = True) -> None:
+        """
+        Initialize the transformation engine.
+
+        :param tfs: List of transformations to apply.
+        :type tfs: List[Transformation]
+        :param verbose: Enable detailed logging.
+        :type verbose: bool
+        :return: None
+        :rtype: None
+        """
         self.tfs = tfs
         self.verbose = verbose
         self.logger = Logger(verbose)
 
     @classmethod
     def default_six(cls, verbose : bool = True) -> "TransformationEngine":
+        """
+        Create engine with default six transformations for visualization.
+
+        :param verbose: Enable detailed logging.
+        :type verbose: bool
+        :return: Configured TransformationEngine instance.
+        :rtype: TransformationEngine
+        """
         tfs: List[Transformation] = [
             GrayscaleL(),
             Hue(),
@@ -354,6 +582,14 @@ class TransformationEngine:
     
     @classmethod
     def trainning(cls, verbose : bool = True) -> "TransformationEngine":
+        """
+        Create engine with transformations optimized for training.
+
+        :param verbose: Enable detailed logging.
+        :type verbose: bool
+        :return: Configured TransformationEngine instance.
+        :rtype: TransformationEngine
+        """
         tfs: List[Transformation] = [
             Hue(),
             Masked(threshold=35, fill_size=200),
@@ -364,6 +600,16 @@ class TransformationEngine:
     
     @classmethod
     def only_selected(cls, only: list[str], verbose : bool = True) -> "TransformationEngine":
+        """
+        Create engine with only specified transformations.
+
+        :param only: List of transformation names to include.
+        :type only: list[str]
+        :param verbose: Enable detailed logging.
+        :type verbose: bool
+        :return: Configured TransformationEngine instance.
+        :rtype: TransformationEngine
+        """
         if not isinstance(only, list) or len(only) == 0:
             raise ValueError("only_selected expects a non-empty list of transformations")
 
@@ -392,6 +638,14 @@ class TransformationEngine:
 
 
     def apply_all(self, img: np.ndarray) -> Dict[str, np.ndarray]:
+        """
+        Apply all transformations and return results as dictionary.
+
+        :param img: Input image array.
+        :type img: np.ndarray
+        :return: Dictionary mapping transformation names to result images.
+        :rtype: Dict[str, np.ndarray]
+        """
         ctx = TransformationPipeline(img=_ensure_uint8(img), cache={})
 
         results: Dict[str, np.ndarray] = {}
@@ -407,6 +661,14 @@ class TransformationEngine:
 
 
     def apply_all_as_tensor(self, img: np.ndarray) -> torch.Tensor:
+        """
+        Apply all transformations and return as stacked tensor.
+
+        :param img: Input image array.
+        :type img: np.ndarray
+        :return: Tensor of shape (num_transforms, height, width).
+        :rtype: torch.Tensor
+        """
         ctx = TransformationPipeline(img=_ensure_uint8(img), cache={})
 
         channels: List[np.ndarray] = []
@@ -426,6 +688,16 @@ class TransformationEngine:
         items: List[Tuple[Path, int]],
         img_size: Tuple[int, int] = (224, 224)
     ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Transform a batch of images from file paths.
+
+        :param items: List of (image_path, label) tuples.
+        :type items: List[Tuple[Path, int]]
+        :param img_size: Target image size as (height, width).
+        :type img_size: Tuple[int, int]
+        :return: Tuple of (features_tensor, labels_tensor).
+        :rtype: Tuple[torch.Tensor, torch.Tensor]
+        """
         X_list: List[torch.Tensor] = []
         y_list: List[int] = []
 
@@ -455,6 +727,20 @@ class TransformationEngine:
         capacity: float = 1.0,
         seed: int = 42
     ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Load pre-transformed images from disk and group by base filename.
+
+        :param items: List of (image_path, label) tuples.
+        :type items: List[Tuple[Path, int]]
+        :param img_size: Target image size as (height, width).
+        :type img_size: Tuple[int, int]
+        :param capacity: Fraction of data to load (0 < capacity <= 1.0).
+        :type capacity: float
+        :param seed: Random seed for sampling.
+        :type seed: int
+        :return: Tuple of (features_tensor, labels_tensor).
+        :rtype: Tuple[torch.Tensor, torch.Tensor]
+        """
 
         if not (0 < capacity <= 1.0):
             self.logger.error("capacity must be in (0, 1]")
@@ -574,6 +860,16 @@ class TransformationEngine:
         items: List[Tuple[Path, int]],
         transform_dir: Path
     ) -> List[Tuple[Path, int]]:
+        """
+        Map original image paths to their transformed versions.
+
+        :param items: List of (original_image_path, label) tuples.
+        :type items: List[Tuple[Path, int]]
+        :param transform_dir: Directory containing transformed images.
+        :type transform_dir: Path
+        :return: List of (transformed_image_path, label) tuples.
+        :rtype: List[Tuple[Path, int]]
+        """
         tf_names = [tf.name for tf in self.tfs]
         transformed_items: List[Tuple[Path, int]] = []
 
@@ -597,12 +893,36 @@ class TransformationEngine:
     
 
 class TransformationDirectory:
+    """
+    Batch processor for applying transformations to entire directories.
+    """
+
     def __init__(self, engine: TransformationEngine, verbose : bool = True) -> None:
+        """
+        Initialize the directory transformer.
+
+        :param engine: Transformation engine to use.
+        :type engine: TransformationEngine
+        :param verbose: Enable detailed logging.
+        :type verbose: bool
+        :return: None
+        :rtype: None
+        """
         self.engine = engine
         self.pm = PathManager()
         self.logger = Logger(verbose)
 
     def _build_label_map(self, src: Path, recursive: bool) -> Dict[str, int]:
+        """
+        Build mapping from class names to numeric IDs.
+
+        :param src: Source directory or file path.
+        :type src: Path
+        :param recursive: Whether to scan recursively.
+        :type recursive: bool
+        :return: Dictionary mapping class names to IDs.
+        :rtype: Dict[str, int]
+        """
         self.logger.info(f"Building label → id map (recursive={recursive})")
 
         if src.is_file():
@@ -629,6 +949,18 @@ class TransformationDirectory:
         dst: Path,
         recursive: bool = True
     ) -> List[Tuple[Path, int]]:
+        """
+        Process all images in source directory and save transformations.
+
+        :param src: Source directory containing images.
+        :type src: Path
+        :param dst: Destination directory for transformed images.
+        :type dst: Path
+        :param recursive: Whether to process subdirectories.
+        :type recursive: bool
+        :return: List of (transformed_image_path, label) tuples.
+        :rtype: List[Tuple[Path, int]]
+        """
 
         self.logger.info(f"TransformationDirectory.run")
         self.logger.info(f"  src = {src}")
@@ -731,6 +1063,12 @@ class TransformationDirectory:
 
 
 def main():
+    """
+    Main function placeholder for transformation module.
+
+    :return: None
+    :rtype: None
+    """
     [...]
 
 

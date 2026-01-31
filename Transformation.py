@@ -14,6 +14,15 @@ from leaffliction.utils import Logger
 
 
 def main() -> None:
+    """
+    Apply image transformations to single images or directories.
+
+    Processes plant leaf images through various transformations (grayscale,
+    hue extraction, masking, etc.) and displays or saves results.
+
+    :return: None
+    :rtype: None
+    """
     parser = ArgsManager().build_transformation_parser()
     args = parser.parse_args()
 
