@@ -14,7 +14,9 @@ import matplotlib.pyplot as plt
 from leaffliction.utils import PathManager
 from collections import defaultdict
 from random import Random
-
+from leaffliction.utils import Logger
+from leaffliction.plotting import Plotter
+import sys
 
 def _ensure_uint8(img: np.ndarray) -> np.ndarray:
     if img.dtype != np.uint8:
@@ -38,7 +40,7 @@ def _to_gray_if_color(img: np.ndarray) -> np.ndarray:
 
 @dataclass
 class TransformationPipeline:
-    img: np.ndarray  # BGR ou RGB, on ne touche pas ici
+    img: np.ndarray
     cache: Dict[str, np.ndarray]
 
     def get(self, key: str) -> np.ndarray:
@@ -126,11 +128,10 @@ class TransformationPipeline:
 
         roi_start_x = 0
         roi_start_y = 0
-        roi_h = image.shape[0]  # rows
-        roi_w = image.shape[1]  # cols
+        roi_h = image.shape[0]
+        roi_w = image.shape[1]
         roi_line_w = 5
 
-        # PlantCV ROI rectangle
         roi = pcv.roi.rectangle(
             img=masked,
             x=roi_start_x,
@@ -254,7 +255,6 @@ class RoiImage:
 
 def _draw_pseudolandmarks(image: np.ndarray, pseudolandmarks, color_bgr, radius: int) -> np.ndarray:
     out = image.copy()
-    # gérer 4 canaux
     if out.ndim == 3 and out.shape[2] == 4 and len(color_bgr) == 3:
         color = (*color_bgr, 255)
     else:
@@ -267,8 +267,8 @@ def _draw_pseudolandmarks(image: np.ndarray, pseudolandmarks, color_bgr, radius:
         if p.size < 2:
             continue
 
-        row = int(p[0][0])  # y
-        col = int(p[0][1])  # x
+        row = int(p[0][0])
+        col = int(p[0][1])
 
         cv2.circle(out, (row, col), radius, color, thickness=-1)
 
@@ -316,21 +316,16 @@ class PseudoLandmarks:
             label="default"
         )
         # Red
-        pseudo_img = _draw_pseudolandmarks(pseudo_img, top_x, (255, 0, 0), 5)       # red
+        pseudo_img = _draw_pseudolandmarks(pseudo_img, top_x, (255, 0, 0), 5)
         # Magenta
-        pseudo_img = _draw_pseudolandmarks(pseudo_img, bottom_x, (255, 0, 255), 5)  # magenta
+        pseudo_img = _draw_pseudolandmarks(pseudo_img, bottom_x, (255, 0, 255), 5)
         # Blue
-        pseudo_img = _draw_pseudolandmarks(pseudo_img, center_v_x, (0, 0, 255), 5)  # blue
+        pseudo_img = _draw_pseudolandmarks(pseudo_img, center_v_x, (0, 0, 255), 5)
 
         return _ensure_uint8(pseudo_img)
 
 
 def _base_stem_and_tf_name(stem: str, tf_names: List[str]) -> Tuple[Optional[str], Optional[str]]:
-    """
-    Détecte si le fichier correspond à un transform: <base>_<tfname>.png
-    Retourne (base_stem, tf_name) ou (None, None) si non reconnu.
-    """
-    # On matche par suffixe pour éviter les problèmes si le nom contient des underscores
     for tf in tf_names:
         suf = "_" + tf
         if stem.endswith(suf):
@@ -340,11 +335,13 @@ def _base_stem_and_tf_name(stem: str, tf_names: List[str]) -> Tuple[Optional[str
 
 
 class TransformationEngine:
-    def __init__(self, tfs: List[Transformation]) -> None:
+    def __init__(self, tfs: List[Transformation], verbose : bool = True) -> None:
         self.tfs = tfs
+        self.verbose = verbose
+        self.logger = Logger(verbose)
 
     @classmethod
-    def default_six(cls) -> "TransformationEngine":
+    def default_six(cls, verbose : bool = True) -> "TransformationEngine":
         tfs: List[Transformation] = [
             GrayscaleL(),
             Hue(),
@@ -354,17 +351,46 @@ class TransformationEngine:
             AnalyzeImage(),
             PseudoLandmarks(threshold=35, fill_size=200),
         ]
-        return cls(tfs=tfs)
+        return cls(tfs=tfs, verbose=verbose)
     
     @classmethod
-    def trainning(cls) -> "TransformationEngine":
+    def trainning(cls, verbose : bool = True) -> "TransformationEngine":
         tfs: List[Transformation] = [
             Hue(),
             Masked(threshold=35, fill_size=200),
             AnalyzeImage(),
             PseudoLandmarks(threshold=35, fill_size=200),
         ]
-        return cls(tfs=tfs)
+        return cls(tfs=tfs, verbose=verbose)
+    
+    @classmethod
+    def only_selected(cls, only: list[str], verbose : bool = True) -> "TransformationEngine":
+        if not isinstance(only, list) or len(only) == 0:
+            raise ValueError("only_selected expects a non-empty list of transformations")
+
+        mapping = {
+            "grayscale": GrayscaleL(),
+            "gaussian": GaussianMask(threshold=120, fill_size=200),
+            "mask": Masked(threshold=35, fill_size=200),
+            "hue": Hue(),
+            "roi": RoiImage(),
+            "analyze": AnalyzeImage(),
+            "pseudo": PseudoLandmarks(threshold=35, fill_size=200),
+        }
+
+        tfs: list[Transformation] = []
+
+        for name in only:
+            key = name.lower()
+            if key not in mapping:
+                raise ValueError(
+                    f"Unknown transformation '{name}'. "
+                    f"Available: {list(mapping.keys())}"
+                )
+            tfs.append(mapping[key])
+
+        return cls(tfs=tfs, verbose=verbose)
+
 
     def apply_all(self, img: np.ndarray) -> Dict[str, np.ndarray]:
         ctx = TransformationPipeline(img=_ensure_uint8(img), cache={})
@@ -376,7 +402,10 @@ class TransformationEngine:
         # if ctx.has("kept_mask"):
         #     results["kept_mask"] = ctx.get("kept_mask")
 
+
         return results
+    
+
 
     def apply_all_as_tensor(self, img: np.ndarray) -> torch.Tensor:
         ctx = TransformationPipeline(img=_ensure_uint8(img), cache={})
@@ -404,10 +433,10 @@ class TransformationEngine:
         for img_path, label in items:
             img = cv2.imread(str(img_path))
             if img is None:
-                print(f"⚠️  Warning: Could not load {img_path}")
+                self.logger.warn(f" Warning: Could not load {img_path}")
                 continue
             else:
-                print(f"Processing: {img_path}")
+                self.logger.info(f"Processing: {img_path}")
 
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             img = cv2.resize(img, img_size)
@@ -420,77 +449,6 @@ class TransformationEngine:
         y = torch.tensor(y_list, dtype=torch.long)
         return X, y
     
-    # def load_transformer_items(
-    #     self,
-    #     items: List[Tuple[Path, int]],
-    #     img_size: Tuple[int, int] = (224, 224),
-    #     capacity: float = 1.0,
-    #     seed: int = 42
-    # ) -> Tuple[torch.Tensor, torch.Tensor]:
-
-    #     if not (0 < capacity <= 1.0):
-    #         raise ValueError("capacity must be in (0, 1]")
-
-    #     # ---------- 1) Stratified subsampling ----------
-    #     if capacity < 1.0:
-    #         rdm = Random(seed)
-
-    #         items_by_class = defaultdict(list)
-    #         for path, label in items:
-    #             items_by_class[label].append((path, label))
-
-    #         limited_items: List[Tuple[Path, int]] = []
-
-    #         print(f"📉 Applying capacity limit: {int(capacity * 100)}%")
-
-    #         for label, class_items in items_by_class.items():
-    #             n_total = len(class_items)
-    #             n_keep = max(1, int(n_total * capacity))
-
-    #             rdm.shuffle(class_items)
-    #             kept = class_items[:n_keep]
-
-    #             limited_items.extend(kept)
-
-    #             print(
-    #                 f"  class {label}: "
-    #                 f"{n_keep}/{n_total} images kept"
-    #             )
-
-    #         items = limited_items
-    #         rdm.shuffle(items)
-
-    #         print(f"📦 Total images after limit: {len(items)}")
-
-    #     # ---------- 2) Load images ----------
-    #     X_list = []
-    #     y_list = []
-
-    #     for idx, (img_path, label) in enumerate(items, start=1):
-    #         img = cv2.imread(str(img_path))
-    #         if img is None:
-    #             print(f"⚠️  Could not load image: {img_path}")
-    #             continue
-
-    #         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    #         img = cv2.resize(img, img_size)
-
-    #         img = img.astype(np.float32) / 255.0
-    #         img = np.transpose(img, (2, 0, 1))
-
-    #         X_list.append(img)
-    #         y_list.append(label)
-
-    #         if idx % 500 == 0:
-    #             print(f"  Loaded {idx}/{len(items)} images")
-
-    #     if not X_list:
-    #         raise ValueError("No images could be loaded from augmented items.")
-
-    #     X = torch.from_numpy(np.stack(X_list, axis=0))
-    #     y = torch.tensor(y_list, dtype=torch.long)
-
-    #     return X, y
     def load_transformer_items(
         self,
         items: List[Tuple[Path, int]],
@@ -500,19 +458,13 @@ class TransformationEngine:
     ) -> Tuple[torch.Tensor, torch.Tensor]:
 
         if not (0 < capacity <= 1.0):
-            raise ValueError("capacity must be in (0, 1]")
+            self.logger.error("capacity must be in (0, 1]")
+            sys.exit(1)
 
-        # ---------- 1) Stratified subsampling (sur les ITEMS, donc attention) ----------
-        # ⚠️ Ici, items contient potentiellement plusieurs fichiers par image de base.
-        # Si tu appliques capacity ici, tu risques de casser des groupes (il manquera des tfs).
-        # => On applique plutôt capacity APRÈS regroupement, au niveau "image de base".
-        # Donc on ne fait rien ici sur items.
 
-        tf_names = [tf.name for tf in self.tfs]  # ex: ["GaussianMask", "Masked", ...]
+        tf_names = [tf.name for tf in self.tfs]
         tf_set = set(tf_names)
 
-        # ---------- 2) Regrouper par image de base ----------
-        # Key = (label, parent_dir, base_stem) pour éviter collisions si mêmes noms dans dossiers différents
         groups: Dict[Tuple[int, str, str], Dict[str, Path]] = defaultdict(dict)
 
         skipped_non_tf = 0
@@ -521,7 +473,6 @@ class TransformationEngine:
 
             base_stem, tf_name = _base_stem_and_tf_name(stem, tf_names)
             if base_stem is None or tf_name is None:
-                # ignore original/other files
                 skipped_non_tf += 1
                 continue
 
@@ -529,7 +480,8 @@ class TransformationEngine:
             groups[key][tf_name] = p
 
         if not groups:
-            raise ValueError("No transformed items found in 'items'. (Expected files like <base>_<TfName>.png)")
+            self.logger.error("No transformed items found in 'items'.")
+            sys.exit(1)
 
         samples: List[Tuple[List[Path], int]] = []
         missing_groups = 0
@@ -542,19 +494,19 @@ class TransformationEngine:
                 missing_groups += 1
 
         if not samples:
-            raise ValueError(
+            self.logger.error(
                 "No complete samples with all transforms were found. "
-                f"Groups total={len(groups)}, missing_groups={missing_groups}."
-            )
+                f"Groups total={len(groups)}, missing_groups={missing_groups}.")
+            sys.exit(1)
 
-        print(f"🧩 Grouping done: {len(groups)} groups")
-        print(f"✅ Complete samples (all {len(tf_names)} transforms): {len(samples)}")
+        self.logger.info(f"Grouping done: {len(groups)} groups")
+        self.logger.info(f"Complete samples (all {len(tf_names)} transforms): {len(samples)}")
         if missing_groups:
-            print(f"⚠️ Incomplete groups skipped: {missing_groups}")
+            self.logger.info(f"Incomplete groups skipped: {missing_groups}")
         if skipped_non_tf:
-            print(f"ℹ️ Non-transform files ignored: {skipped_non_tf}")
+            self.logger.info(f"Non-transform files ignored: {skipped_non_tf}")
 
-        # ---------- 4) Capacity STRATIFIÉE au niveau sample ----------
+
         if capacity < 1.0:
             rdm = Random(seed)
             samples_by_class: Dict[int, List[Tuple[List[Path], int]]] = defaultdict(list)
@@ -562,20 +514,20 @@ class TransformationEngine:
                 samples_by_class[s[1]].append(s)
 
             limited_samples: List[Tuple[List[Path], int]] = []
-            print(f"📉 Applying capacity limit on samples: {int(capacity * 100)}%")
+            self.logger.info(f"Applying capacity limit on samples: {int(capacity * 100)}%")
 
             for label, class_samples in samples_by_class.items():
                 n_total = len(class_samples)
                 n_keep = max(1, int(n_total * capacity))
                 rdm.shuffle(class_samples)
                 limited_samples.extend(class_samples[:n_keep])
-                print(f"  class {label}: {n_keep}/{n_total} samples kept")
+                self.logger.info(f"  class {label}: {n_keep}/{n_total} samples kept")
 
             samples = limited_samples
             rdm.shuffle(samples)
-            print(f"📦 Total samples after limit: {len(samples)}")
+            self.logger.info(f"Total samples after limit: {len(samples)}")
 
-        # ---------- 5) Charger les 5 PNG en grayscale -> stack (5,H,W) ----------
+
         X_list: List[torch.Tensor] = []
         y_list: List[int] = []
 
@@ -586,7 +538,7 @@ class TransformationEngine:
             for p in paths_5:
                 ch = cv2.imread(str(p), cv2.IMREAD_GRAYSCALE)  # (H,W)
                 if ch is None:
-                    print(f"⚠️ Could not read: {p}")
+                    self.logger.warn(f"⚠️ Could not read: {p}")
                     ok = False
                     break
 
@@ -602,17 +554,19 @@ class TransformationEngine:
             y_list.append(int(label))
 
             if idx % 500 == 0:
-                print(f"  Loaded {idx}/{len(samples)} samples")
+                self.logger.info(f"  Loaded {idx}/{len(samples)} samples")
 
         if not X_list:
-            raise ValueError("No samples could be loaded (all failed during cv2.imread).")
+            self.logger.error("No samples could be loaded (all failed during cv2.imread).")
+            sys.exit(1)
 
         X = torch.stack(X_list, dim=0)  # (N, 5, H, W)
         y = torch.tensor(y_list, dtype=torch.long)
 
         expected_c = len(self.tfs)
         if X.shape[1] != expected_c:
-            raise ValueError(f"Expected {expected_c} channels, got {tuple(X.shape)}")
+            self.logger.error(f"Expected {expected_c} channels, got {tuple(X.shape)}")
+            sys.exit(1)
 
         return X, y
     
@@ -635,11 +589,6 @@ class TransformationEngine:
         transformed_items: List[Tuple[Path, int]] = []
 
         for img_path, class_id in items:
-            # ⚠️ On reconstruit le chemin relatif à partir de la racine du dataset
-            # => on enlève le premier dossier (classe) implicitement via parent
-            # Exemple:
-            # dataset/train/Apple_Black_rot/img1.jpg
-            # transform/train/Apple_Black_rot/img1_<TF>.png
 
             class_dir = img_path.parent.name
             stem = img_path.stem
@@ -648,13 +597,10 @@ class TransformationEngine:
 
             for tf_name in tf_names:
                 tf_path = out_dir / f"{stem}_{tf_name}.png"
-                # print(f"{tf_path}")
                 if tf_path.exists():
-                    # print("exist")
                     transformed_items.append((tf_path, int(class_id)))
                 else:
-                    # volontairement silencieux
-                    # print(f"⚠️ Missing transform: {tf_path}")
+
                     pass
 
         return transformed_items
@@ -662,16 +608,17 @@ class TransformationEngine:
     
 
 class TransformationDirectory:
-    def __init__(self, engine: TransformationEngine) -> None:
+    def __init__(self, engine: TransformationEngine, verbose : bool = True) -> None:
         self.engine = engine
         self.pm = PathManager()
+        self.logger = Logger(verbose)
 
     def _build_label_map(self, src: Path, recursive: bool) -> Dict[str, int]:
-        print(f"\n🔎 Building label → id map (recursive={recursive})")
+        self.logger.info(f"Building label → id map (recursive={recursive})")
 
         if src.is_file():
             label = src.parent.name
-            print(f"  • Single file mode → label '{label}' → id 0")
+            self.logger.info(f"  • Single file mode → label '{label}' → id 0")
             return {label: 0}
 
         labels = set()
@@ -681,9 +628,9 @@ class TransformationDirectory:
         sorted_labels = sorted(labels)
         label_to_id = {label: i for i, label in enumerate(sorted_labels)}
 
-        print("  ✔ Labels found:")
+        self.logger.info("  ✔ Labels found:")
         for label, idx in label_to_id.items():
-            print(f"    - {label} → {idx}")
+            self.logger.info(f"    - {label} → {idx}")
 
         return label_to_id
 
@@ -694,43 +641,38 @@ class TransformationDirectory:
         recursive: bool = True
     ) -> List[Tuple[Path, int]]:
 
-        print(f"\n🚀 TransformationDirectory.run")
-        print(f"  src = {src}")
-        print(f"  dst = {dst}")
-        print(f"  recursive = {recursive}")
+        self.logger.info(f"TransformationDirectory.run")
+        self.logger.info(f"  src = {src}")
+        self.logger.info(f"  dst = {dst}")
+        self.logger.info(f"  recursive = {recursive}")
 
         self.pm.ensure_dir(dst)
         items: List[Tuple[Path, int]] = []
 
-        # 1) list images
         if src.is_file():
             paths = [src]
-            print("📄 Source is a single file")
+            self.logger.info("Source is a single file")
         else:
             paths = list(self.pm.iter_images(src, recursive=recursive))
-            print(f"📁 Found {len(paths)} images under {src}")
+            self.logger.info(f"Found {len(paths)} images under {src}")
 
-        # 2) label -> id mapping
         label_to_id = self._build_label_map(src, recursive=recursive)
 
-        # 3) transformation names
         tf_names = [tf.name for tf in self.engine.tfs]
-        print(f"\n🧪 Transformations ({len(tf_names)}): {tf_names}")
+        self.logger.info(f"Transformations ({len(tf_names)}): {tf_names}")
 
-        # 4) iterate images
         for idx, p in enumerate(paths, start=1):
-            print(f"\n➡️  [{idx}/{len(paths)}] Processing image:")
-            print(f"    path = {p}")
+            self.logger.info(f"[{idx}/{len(paths)}] Processing image:")
+            self.logger.info(f"    path = {p}")
 
             label = p.parent.name
             if label not in label_to_id:
-                print(f"    ⚠️  Unknown label '{label}', skipping")
+                self.logger.warn(f"    Unknown label '{label}', skipping")
                 continue
 
             class_id = label_to_id[label]
-            print(f"    label = '{label}' → class_id = {class_id}")
+            self.logger.info(f"    label = '{label}' → class_id = {class_id}")
 
-            # output directory mirroring
             mirrored_file = (
                 self.pm.mirror_path(p, src_root=src, target_root=dst)
                 if src.is_dir()
@@ -739,51 +681,47 @@ class TransformationDirectory:
             out_dir = self.pm.ensure_dir(mirrored_file.parent)
             stem = p.stem
 
-            print(f"    output dir = {out_dir}")
-            print(f"    stem = {stem}")
+            self.logger.info(f"    output dir = {out_dir}")
+            self.logger.info(f"    stem = {stem}")
 
-            # 5) check missing outputs (NO ORIGINAL)
             missing_tf_names = [
                 name for name in tf_names
                 if not (out_dir / f"{stem}_{name}.png").exists()
             ]
 
             if missing_tf_names:
-                print(f"    missing transforms = {missing_tf_names}")
+                self.logger.info(f"    missing transforms = {missing_tf_names}")
             else:
-                print(f"    ✅ all transforms already exist (nothing to do)")
+                self.logger.info(f"    all transforms already exist (nothing to do)")
 
-                # On retourne quand même les paths existants des transforms
                 for name in tf_names:
                     items.append((out_dir / f"{stem}_{name}.png", class_id))
                 continue
 
-            # 6) load image only if needed
-            print("    📥 Loading image")
+            self.logger.info("    Loading image")
             img = cv2.imread(str(p))
             if img is None:
-                print(f"    ❌ Could not load image, skipping")
+                self.logger.error(f"   Could not load image, skipping")
                 continue
 
             img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-            # 7) compute ONLY missing transforms, keep ctx/cache consistent
-            print("    🔄 Applying transformations")
+            self.logger.info("    Applying transformations")
             ctx = TransformationPipeline(img=_ensure_uint8(img_rgb), cache={})
 
             for tf in self.engine.tfs:
                 out_img = tf.apply(ctx)
 
                 if tf.name not in missing_tf_names:
-                    print(f"      ⏭️  {tf.name} (already exists)")
+                    self.logger.info(f"      {tf.name} (already exists)")
                     continue
 
                 out_path = out_dir / f"{stem}_{tf.name}.png"
                 if out_path.exists():
-                    print(f"      ⏭️  {tf.name} appeared meanwhile, skip")
+                    self.logger.info(f"      {tf.name} appeared meanwhile, skip")
                     continue
 
-                print(f"      ✨ Writing {tf.name} → {out_path.name}")
+                self.logger.info(f"      Writing {tf.name} → {out_path.name}")
 
                 if out_img.ndim == 3 and out_img.shape[2] == 3:
                     out_bgr = cv2.cvtColor(out_img, cv2.COLOR_RGB2BGR)
@@ -792,14 +730,15 @@ class TransformationDirectory:
 
                 cv2.imwrite(str(out_path), _ensure_uint8(out_bgr))
 
-            # 8) register all transform outputs (existing + newly created)
+            
             for name in tf_names:
                 items.append((out_dir / f"{stem}_{name}.png", class_id))
 
-        print(f"\n✅ TransformationDirectory finished")
-        print(f"📦 Total transformed items returned: {len(items)}")
+        self.logger.info(f"\nTransformationDirectory finished")
+        self.logger.info(f"Total transformed items returned: {len(items)}")
 
         return items
+
 
 
 def main():
@@ -808,233 +747,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-# def plot_stat_hist(label, sc=1):
-
-#     """
-#     Retrieve the histogram x and y values and plot them
-#     """
-
-#     y = pcv.outputs.observations['default_1'][label]['value']
-#     x = [
-#         i * sc
-#         for i in pcv.outputs.observations['default_1'][label]['label']
-#     ]
-#     if label == "hue_frequencies":
-#         x = x[:int(255 / 2)]
-#         y = y[:int(255 / 2)]
-#     if (
-#         label == "blue-yellow_frequencies" or
-#         label == "green-magenta_frequencies"
-#     ):
-#         x = [x + 128 for x in x]
-#     plt.plot(x, y, label=label)
-
-
-# def plot_histogram(image, kept_mask):
-
-#     """
-#     Plot the histogram of the image
-#     """
-
-#     dict_label = {
-#         "blue_frequencies": 1,
-#         "green_frequencies": 1,
-#         "green-magenta_frequencies": 1,
-#         "lightness_frequencies": 2.55,
-#         "red_frequencies": 1,
-#         "blue-yellow_frequencies": 1,
-#         "hue_frequencies": 1,
-#         "saturation_frequencies": 2.55,
-#         "value_frequencies": 2.55
-#     }
-
-#     labels, _ = pcv.create_labels(mask=kept_mask)
-#     pcv.analyze.color(
-#         rgb_img=image,
-#         colorspaces="all",
-#         labeled_mask=labels,
-#         label="default"
-#     )
-
-#     plt.subplots(figsize=(16, 9))
-#     for key, val in dict_label.items():
-#         plot_stat_hist(key, val)
-
-#     plt.legend()
-
-#     plt.title("Color Histogram")
-#     plt.xlabel("Pixel intensity")
-#     plt.ylabel("Proportion of pixels (%)")
-#     plt.grid(
-#         visible=True,
-#         which='major',
-#         axis='both',
-#         linestyle='--',
-#     )
-#     plt.show()
-#     plt.close()
-
-
-
-# def create_roi_image(image, masked, filled):
-#     """
-#     Create an image with the ROI rectangle and the mask
-#     """
-#     roi_start_x = 0
-#     roi_start_y = 0
-#     roi_h = image.shape[0]  
-#     roi_w = image.shape[1]  
-#     roi_line_w = 5
-
-  
-#     roi = pcv.roi.rectangle(
-#         img=masked,
-#         x=roi_start_x,
-#         y=roi_start_y,
-#         w=roi_w,
-#         h=roi_h
-#     )
-
-#     kept_mask = pcv.roi.filter(mask=filled, roi=roi, roi_type="partial")
-
-#     roi_image = image.copy()
-
-
-#     roi_image[kept_mask != 0] = (0, 255, 0)
-
-
-#     cv2.rectangle(
-#         roi_image,
-#         (roi_start_x, roi_start_y),
-#         (roi_start_x + roi_w - 1, roi_start_y + roi_h - 1),
-#         (255, 0, 0),
-#         thickness=roi_line_w
-#     )
-
-#     return roi_image, kept_mask
-
-
-# def draw_pseudolandmarks(image, pseudolandmarks, color, radius):
-#     out = image.copy()
-
-#     if out.ndim == 3 and out.shape[2] == 4 and len(color) == 3:
-#         color = (*color, 255)
-
-#     for p in pseudolandmarks:
-#         if p is None:
-#             continue
-#         p = np.asarray(p)
-#         if p.size < 2:
-#             continue
-
-#         row = int(p[0][0])  # y
-#         col = int(p[0][1])  # x
-
-#         cv2.circle(out, (row, col), radius, color, thickness=-1)
-
-#     return out
-
-
-
-# def create_pseudolandmarks_image(image, kept_mask):
-#     """
-#     Create a displayable image with the pseudolandmarks
-#     """
-#     pseudo_img = image.copy()
-
-#     top_x, bottom_x, center_v_x = pcv.homology.x_axis_pseudolandmarks(
-#         img=pseudo_img, mask=kept_mask, label="default"
-#     )
-
-#     pseudo_img = draw_pseudolandmarks(pseudo_img, top_x, (255, 0, 0), 5)       # red
-#     pseudo_img = draw_pseudolandmarks(pseudo_img, bottom_x, (255, 0, 255), 5)  # magenta
-#     pseudo_img = draw_pseudolandmarks(pseudo_img, center_v_x, (0, 0, 255), 5)  # blue
-
-#     return pseudo_img
-
-# def main():
-    
-#     # path = "../leaves/images/Apple_Black_rot/image (100).JPG"
-#     # path = "../leaves/images/Apple_rust/image (100).JPG"
-#     # path = "../leaves/images/Apple_scab/image (100).JPG"
-#     path = "../leaves/images/Apple_healthy/image (100).JPG"
-#     # path = "../leaves/test.JPG"
-
-#     # img, _, _ = pcv.readimage(filename=path, mode='rgb')
-
-#     img = cv2.imread(path)
-
-#     img_no_bg = rembg.remove(img)
-    
-
-#     grayscale = pcv.rgb2gray_lab(rgb_img=img_no_bg, channel="l")
-
-#     thresh = pcv.threshold.binary(
-#         gray_img=grayscale, threshold=120, object_type='light'
-#     )
-
-#     filled = pcv.fill(
-#         bin_img=thresh, size=200
-#     )
-
-#     gaussian_blur = pcv.gaussian_blur(img=filled, ksize=(3,3))
-
-#     masked = pcv.apply_mask(img=img, mask=gaussian_blur, mask_color="white")
-
-
-#     roi_image, kept_mask = create_roi_image(img, masked, filled)
-
-#     analyze_image = pcv.analyze.size(img=img, labeled_mask=kept_mask)
-
-#     pseudolandmarks = create_pseudolandmarks_image(img, kept_mask)
-
-
-#     pcv.plot_image(img, title="original")
-#     pcv.plot_image(gaussian_blur, title="Gaussian")
-#     pcv.plot_image(masked, title="masked")
-#     pcv.plot_image(roi_image, title="roi image")
-#     pcv.plot_image(analyze_image, title="analyze image")
-#     pcv.plot_image(pseudolandmarks, title="pseudo")
-
-  
-
-#     # Create the figure to plot
-#     fig, ax = plt.subplots(ncols=3, nrows=2, figsize=(16, 9))
-
-
-#     images = {
-#         "Original": cv2.cvtColor(img, cv2.COLOR_BGR2RGB),
-#         "Gaussian blur": cv2.cvtColor(gaussian_blur, cv2.COLOR_BGR2RGB),
-#         "Mask": cv2.cvtColor(masked, cv2.COLOR_BGR2RGB),
-#         "ROI Objects": cv2.cvtColor(roi_image, cv2.COLOR_BGR2RGB),
-#         "Analyze object": cv2.cvtColor(analyze_image, cv2.COLOR_BGR2RGB),
-#         "Pseudolandmarks": cv2.cvtColor(pseudolandmarks, cv2.COLOR_BGR2RGB),
-#     }
-
-#     # Title of the plot
-#     fig.suptitle(f"Transformation of {path}")
-
-#     # Put the images on the plot
-#     for (label, img), axe in zip(images.items(), ax.flat):
-
-#         if label in [
-#             "Pseudowithoutbg",
-#             "Doublewithoutbg",
-#             "Doublewithoutbg"
-#         ]:
-#             continue
-
-#         axe.imshow(img)
-#         axe.set_title(label)
-#         axe.set(xticks=[], yticks=[])
-#         axe.label_outer()
-
-#     plt.show()
-#     plt.close()
-
-#     plot_histogram(img, kept_mask)
 

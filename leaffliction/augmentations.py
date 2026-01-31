@@ -109,6 +109,25 @@ class AugmentationEngine:
             name: augmentation(image=img)['image']
             for name, augmentation in self.augs.items()
             }
+    
+    def apply_all_script(self, img: np.ndarray) -> Dict[str, np.ndarray]:
+        """
+        Apply all defined augmentations to a single image.
+
+        This method is primarily intended for visualization and inspection
+        of the available transformations.
+
+        Args:
+            img: the image to process in a Matlike format.
+
+        Returns:
+            A dictionary mapping augmentation names to their resulting images.
+        """
+        return {
+            name: augmentation(image=img)['image']
+            for name, augmentation in self.augs_demo.items()
+            }
+    
 
     # def augment_dataset(
     #         self,
