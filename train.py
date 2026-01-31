@@ -55,10 +55,11 @@ def main() -> None:
         augmentation_engine=aug_engine,
         transformation_engine=tf_engine,
         labels=labels,
+        verbose=args.verbose
     )
 
 
-    logger = Logger()
+    logger = Logger(args.verbose)
     logger.info("Training information:")
     logger.info(f"   Dataset: {dataset_dir}")
     logger.info(f"   Dataset: {dataset_dir}")

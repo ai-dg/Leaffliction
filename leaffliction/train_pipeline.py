@@ -12,10 +12,24 @@ import sys
 from typing import Optional
 from leaffliction.model import ModelConfig
 from leaffliction.model import ConvolutionalNeuralNetwork
+from leaffliction.utils import Logger
 
 @dataclass
 class TrainConfig:
-    # Paramètres PyTorch
+    """
+    Configuration for training.
+
+    Attributes:
+        epochs: Number of passes over the training set.
+        batch_size: Number of samples processed per batch.
+        lr: Learning rate.
+        valid_ratio: Fraction of the dataset used for validation.
+        seed: Random seed.
+        img_size: Image size as (height, width).
+        augment_train: If True, augmented images are included in the training set.
+        transform_train: If True, transformed images are included in the training set.
+        extra: Extra keyword arguments.
+    """
     epochs: int = 50
     batch_size: int = 32
     lr: float = 1e-3
@@ -52,7 +66,9 @@ class Metrics:
 
 class Trainer:
     """
-    Orchestrateur d'entraînement PyTorch.
+    Training Orchestrator.
+
+    Execute the full training pipeline.
     """
 
     def __init__(
@@ -61,19 +77,21 @@ class Trainer:
         dataset_splitter: Any, 
         augmentation_engine: Any,
         transformation_engine: Any,
-        labels: Any
+        labels: Any,
+        verbose: bool = True,
     ) -> None:
         self.dataset_scanner = dataset_scanner
         self.dataset_splitter = dataset_splitter
         self.augmentation_engine = augmentation_engine
         self.transformation_engine = transformation_engine
         self.labels = labels
+        self.verbose = verbose
+        self.logger = Logger(verbose)
 
     def train(self, dataset_dir: Path, out_dir: Path, cfg: TrainConfig) -> Metrics:
-        print("📂 Scanning dataset...")
+        logger = self.logger
         index = self.dataset_scanner.scan(dataset_dir)
-        print(f"   Found {index.num_classes} classes, {index.size} images")
-        print()
+        logger.info(f"Dataset scan: Found {index.num_classes} classes, {index.size} images")
         
         self.labels.fit(index.class_names)
         
@@ -84,9 +102,11 @@ class Trainer:
             cfg.seed,
             stratified=True
         )
-        print(f"   Train: {len(train_items)} images")
-        print(f"   Valid: {len(valid_items)} images")
-        print()
+        logger.info(
+            f"Dataset split:"
+            f"   Train: {len(train_items)} images"
+            f"   Valid: {len(valid_items)} images"
+        )
 
         X_train = None
         y_train = None
@@ -95,7 +115,7 @@ class Trainer:
 
         aug_dir = None
         if cfg.augment_train:
-            print("🔄 Augmenting train set...")
+            logger.info("Augmenting train set...")
             aug_dir = out_dir / "augmented"
             train_items = self.augmentation_engine.augment_dataset(
                 train_items,
@@ -103,8 +123,7 @@ class Trainer:
                 dataset_dir=dataset_dir,
                 output_dir=aug_dir,
             )
-            print(f"   Created {len(train_items)} total images (original + augmented)")
-            print()
+            logger.info(f"    Created {len(train_items)} total images (original + augmented)")
 
         if cfg.transform_train:
             transform_dir = out_dir / "transform"
@@ -122,7 +141,7 @@ class Trainer:
                 f"train: {len(train_items)}, valid: {len(valid_items)}"
             )
             
-            X_train, y_train = self.transformation_engine.load_transformer_items(train_items, capacity=0.5)
+            X_train, y_train = self.transformation_engine.load_transformer_items(train_items, capacity=0.05)
             X_valid, y_valid = self.transformation_engine.load_transformer_items(valid_items, capacity=1)
         
         if X_train is None or \
