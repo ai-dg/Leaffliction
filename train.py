@@ -32,15 +32,14 @@ def main() -> None:
     out_zip = Path(getattr(args, "out_zip", "learnings.zip"))
 
     cfg = TrainConfig(
-        epochs=getattr(args, "epochs", 50),
-        batch_size=getattr(args, "batch_size", 32),
-        lr=getattr(args, "lr", 1e-3),
-        valid_ratio=getattr(args, "valid_ratio", 0.2),
-        seed=getattr(args, "seed", 42),
-        img_size=(getattr(args, "img_h", 224), getattr(args, "img_w", 224)),
-        augment_train=getattr(args, "augment", True),
-        transform_train=getattr(args, "transform", True),
-        augmentations_per_image=getattr(args, "aug_per_image", 3),
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        lr=args.learning_rate,
+        valid_ratio=args.valid_ratio,
+        seed=args.seed,
+        img_size=(224, 224),
+        augment_train=True,
+        transform_train=True
     )
 
     scanner = DatasetScanner()
