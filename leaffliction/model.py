@@ -21,7 +21,7 @@ class ModelConfig:
     input_channels: int = 7  # Nombre de transformations
     img_size: Tuple[int, int] = (224, 224)
     seed: int = 42
-    extra: Dict[str, Any] = field(default=dict)
+    extra: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

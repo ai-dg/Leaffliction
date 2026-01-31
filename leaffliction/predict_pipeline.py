@@ -16,7 +16,7 @@ from leaffliction.model import InferenceManager
 class PredictConfig:
     show_transforms: bool = True
     top_k: int = 3
-    extra: Dict[str, Any] = field(default=dict)
+    extra: Dict[str, Any] = field(default_factory=dict)
 
 
 class Predictor:

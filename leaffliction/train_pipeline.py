@@ -24,20 +24,30 @@ class TrainConfig:
     img_size: Tuple[int, int] = (224, 224)
     augment_train: bool = True
     transform_train: bool = True
-    augmentations_per_image: int = 3
-    extra: Dict[str, Any] = field(default=dict)
+    extra: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class Metrics:
+    """
+    Training metrics.
+
+    Attributes:
+        train_accuracy: Training accuracy for the final evaluation.
+        valid_accuracy: Validation accuracy for the final evaluation.
+        valid_count: Number of samples in the validation set.
+        history_valid_acc: Mapping epoch -> validation accuracy.
+        history_train_acc: Mapping epoch -> training accuracy.
+        history_train_loss: Mapping epoch -> training loss.
+        notes: Extra info as keyword args.
+    """
     train_accuracy: float
     valid_accuracy: float
     valid_count: int
-    history_valid_acc : Dict[int, int]
-    history_train_acc : Dict[int, int]
-    history_train_loss : Dict[int, int]    
-    notes: Dict[str, Any] = field(default=dict)
-
+    history_valid_acc: Dict[int, float] = field(default_factory=dict)
+    history_train_acc: Dict[int, float] = field(default_factory=dict)
+    history_train_loss: Dict[int, float] = field(default_factory=dict)    
+    notes: Dict[str, Any] = field(default_factory=dict)
 
 
 class Trainer:
