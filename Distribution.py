@@ -19,9 +19,12 @@ def main() -> None:
     title = f"Dataset distribution: {index.root.name}"
 
     plotter = DistributionPlotter()
-    plotter.plot_pie(index.counts, title=title)
-    plotter.plot_bar(index.counts, title=title)
-    plotter.plot_both(index.counts, title)
+    if args.mode == "both":
+        plotter.plot_both(index.counts, title)
+    if args.mode == "pie":
+        plotter.plot_pie(index.counts, title=title)
+    if args.mode == "bar":
+        plotter.plot_bar(index.counts, title=title)
 
 
 if __name__ == "__main__":

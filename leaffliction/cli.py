@@ -41,12 +41,6 @@ class CLIBuilder:
         )
 
         parser.add_argument(
-            "--stats",
-            action="store_true",
-            help="Export distribution statistics to a file"
-        )
-
-        parser.add_argument(
             "--verbose",
             action="store_true",
             help="Display detailed processing information"

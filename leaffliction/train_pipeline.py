@@ -9,6 +9,8 @@ from torch.utils.data import TensorDataset, DataLoader
 
 from Transformation import BatchTransformer
 import sys
+from typing import Optional
+from leaffliction.model import ModelConfig
 
 @dataclass
 class TrainConfig:
@@ -30,7 +32,11 @@ class Metrics:
     train_accuracy: float
     valid_accuracy: float
     valid_count: int
+    history_valid_acc : Dict[int, int]
+    history_train_acc : Dict[int, int]
+    history_train_loss : Dict[int, int]    
     notes: Dict[str, Any] = field(default_factory=dict)
+
 
 
 class PyTorchTrainer:
@@ -91,11 +97,6 @@ class PyTorchTrainer:
             print(f"   Created {len(train_items)} total images (original + augmented)")
             print()
 
-            # print(train_items)
-            # sys.exit(1)
-            # X_train, y_train = self.augmentation_engine.load_augmented_items(train_items)
-            # X_valid, y_valid = self.augmentation_engine.load_augmented_items(valid_items)
-
         if cfg.transform_train:
             transform_dir = out_dir / "transform"
             batch_engine = BatchTransformer(self.transformation_engine)
@@ -103,10 +104,8 @@ class PyTorchTrainer:
 
             if aug_dir:
                 batch_engine.run(aug_dir, transform_dir)
-                # train_items.extend(aug_elements_transformed)
 
             train_items = self.transformation_engine.extract_transformed_items(train_items, transform_dir)
-            # 3️⃣ Extraire UNIQUEMENT les transforms du valid
             valid_items = self.transformation_engine.extract_transformed_items(valid_items, transform_dir)
 
             print(
@@ -116,10 +115,14 @@ class PyTorchTrainer:
             
             X_train, y_train = self.transformation_engine.load_transformer_items(train_items, capacity=0.5)
             X_valid, y_valid = self.transformation_engine.load_transformer_items(valid_items, capacity=1)
-            
         
+        if X_train is None or \
+            y_train is None or \
+            X_valid is None or \
+            y_valid is None:
+            raise ValueError("X_train must be initialized before use")
 
-    
+
         print("📦 Creating DataLoaders...")
         train_dataset = TensorDataset(X_train, y_train)
         valid_dataset = TensorDataset(X_valid, y_valid)
@@ -142,7 +145,7 @@ class PyTorchTrainer:
         
         # 7. Construire modèle
         print("🤖 Building PyTorch model...")
-        from leaffliction.model import ModelConfig
+        
         model_cfg = ModelConfig(
             num_classes=index.num_classes,
             input_channels=X_train.shape[1],  # Nombre de transformations
@@ -167,6 +170,14 @@ class PyTorchTrainer:
         optimizer = torch.optim.Adam(model.parameters(), lr=cfg.lr)
         
         best_valid_acc = 0.0
+
+        history_train_acc = {}
+        history_valid_acc = {}
+        best_valid_acc = float("-inf")
+        best_epoch = -1
+
+        history_train_loss = {}
+        
         
         for epoch in range(cfg.epochs):
             # Training
@@ -190,8 +201,9 @@ class PyTorchTrainer:
                 train_total += y_batch.size(0)
             
             train_acc = train_correct / train_total
+            history_train_acc[epoch + 1] = train_acc
+            history_train_loss[epoch + 1] = train_loss
             
-            # Validation
             model.eval()
             valid_correct = 0
             valid_total = 0
@@ -205,13 +217,12 @@ class PyTorchTrainer:
                     valid_total += y_batch.size(0)
             
             valid_acc = valid_correct / valid_total
+            history_valid_acc[epoch + 1] = valid_acc
             
-            # Sauvegarder meilleur modèle
             if valid_acc > best_valid_acc:
                 best_valid_acc = valid_acc
                 torch.save(model.state_dict(), out_dir / "best_model.pth")
             
-            # Affichage
             if (epoch + 1) % 5 == 0 or epoch == 0:
                 print(f"   Epoch {epoch+1}/{cfg.epochs} - "
                       f"Train Acc: {train_acc:.2%} - "
@@ -221,10 +232,8 @@ class PyTorchTrainer:
         print(f"   Training completed in {training_time:.1f}s")
         print()
         
-        # Charger meilleur modèle
         model.load_state_dict(torch.load(out_dir / "best_model.pth"))
         
-        # 9. Évaluation finale
         print("📈 Final evaluation...")
         model.eval()
         train_correct = 0
@@ -250,11 +259,13 @@ class PyTorchTrainer:
         print(f"   Valid accuracy: {valid_acc:.2%}")
         print()
         
-        # 10. Créer métriques
         metrics = Metrics(
             train_accuracy=train_acc,
             valid_accuracy=valid_acc,
             valid_count=len(valid_items),
+            history_train_acc=history_train_acc,
+            history_valid_acc=history_valid_acc,
+            history_train_loss=history_train_loss,
             notes={
                 "training_time": training_time,
                 "epochs": cfg.epochs,

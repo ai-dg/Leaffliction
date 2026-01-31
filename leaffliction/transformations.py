@@ -81,7 +81,7 @@ class TFContext:
 
         self.set("grayscale_l", grayscale)
 
-
+        
 
         thresh = pcv.threshold.binary(gray_img=grayscale, threshold=threshold, object_type="light")
         thresh = _ensure_uint8(thresh)
@@ -523,13 +523,12 @@ class TransformationEngine:
         if not groups:
             raise ValueError("No transformed items found in 'items'. (Expected files like <base>_<TfName>.png)")
 
-        # ---------- 3) Construire la liste des "samples" complets (qui ont les 5 tfs) ----------
         samples: List[Tuple[List[Path], int]] = []
         missing_groups = 0
 
         for (label, parent_str, base_stem), tf_map in groups.items():
             if tf_set.issubset(tf_map.keys()):
-                ordered_paths = [tf_map[name] for name in tf_names]  # ordre fixe des channels
+                ordered_paths = [tf_map[name] for name in tf_names]
                 samples.append((ordered_paths, label))
             else:
                 missing_groups += 1

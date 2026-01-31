@@ -19,10 +19,6 @@ class PredictConfig:
 
 
 class PyTorchPredictor:
-    """
-    Charge un PyTorchModelBundle puis prédit sur une image.
-    """
-
     def __init__(self, bundle_loader: PyTorchModelBundle, transformation_engine: Any) -> None:
         self.bundle_loader = bundle_loader
         self.transformation_engine = transformation_engine
@@ -64,7 +60,7 @@ class PyTorchPredictor:
             if not bundle_zip.exists():
                 raise FileNotFoundError(f"Bundle zip not found: {bundle_zip}")
 
-            print("📦 Loading model bundle from zip...")
+            print("Loading model bundle from zip...")
             with tempfile.TemporaryDirectory() as temp_dir:
                 bundle = self.bundle_loader.load_from_zip(bundle_zip, Path(temp_dir))
             print("   Model loaded successfully")
@@ -74,7 +70,7 @@ class PyTorchPredictor:
             if not model_path.exists():
                 raise FileNotFoundError(f"Model path not found: {model_path}")
 
-            print("📦 Loading model bundle from directory...")
+            print("Loading model bundle from directory...")
             bundle = self.bundle_loader.load(model_path)
             print("   Model loaded successfully")
             print()
@@ -90,16 +86,16 @@ class PyTorchPredictor:
         
         # Créer tensor avec transformations
         tensor = self.transformation_engine.apply_all_as_tensor(img_resized)
-        print(f"   Tensor shape: {tensor.shape}")
+        print(f"Tensor shape: {tensor.shape}")
         print()
 
-        print("🧾 Labels mapping (id -> label):")
+        print("Labels mapping (id -> label):")
         print(bundle.labels.class_to_id)
         print(bundle.labels.id_to_class)
 
         
         # 3. Prédire
-        print("🎯 Predicting...")
+        print("Predicting...")
         pred_id, probs = bundle.predict(tensor)
         predicted_label = bundle.labels.decode(pred_id)
         print(f"   Predicted: {predicted_label}")

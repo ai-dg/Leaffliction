@@ -9,6 +9,7 @@ from leaffliction.transformations import TransformationEngine
 from leaffliction.model import PyTorchModelFactory, LabelEncoder
 from leaffliction.train_pipeline import PyTorchTrainer, TrainConfig, RequirementsGate, TrainingPackager
 from leaffliction.utils import ZipPackager, Hasher
+from leaffliction.plotting import DistributionPlotter
 
 
 def main() -> None:
@@ -63,6 +64,10 @@ def main() -> None:
 
     # Entraînement
     metrics = trainer.train(dataset_dir=dataset_dir, out_dir=out_dir, cfg=cfg)
+    plotter = DistributionPlotter()
+    plotter.plot_learning_curve(metrics.history_train_acc, metrics.history_valid_acc)
+    plotter.plot_learning_curve_loss(metrics.history_train_loss)
+
 
     # Vérification des contraintes
     gate = RequirementsGate()
@@ -81,6 +86,8 @@ def main() -> None:
     signature_file.write_text(signature + "\n")
     print(f"   Signature saved to {signature_file}")
     print()
+
+    
 
     print("=" * 60)
     print("✅ Training completed successfully!")
