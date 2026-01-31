@@ -5,11 +5,6 @@ from pathlib import Path
 
 
 class ArgsManager:
-    """
-    Centralise argparse pour éviter duplication dans les entrypoints root.
-    Tu peux faire 5 méthodes: distribution, augmentation, transformation, train, predict.
-    """
-
     def build_distribution_parser(self) -> argparse.ArgumentParser:
         """
         Build and configure the argument parser for the Distribution script.

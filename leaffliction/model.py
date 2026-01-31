@@ -213,14 +213,16 @@ class InferenceManager:
         zip_path = Path(zip_path)
         logger = Logger(verbose)
         if not zip_path.exists():
-            raise FileNotFoundError(f"Zip not found: {zip_path}")
+            logger.error(f"Zip not found: {zip_path}")
+            sys.exit(1)
 
         paths = ModelPaths()
 
         def find_root(root: Path) -> Path:
             hits = list(root.rglob(paths.config_file))
             if not hits:
-                raise FileNotFoundError(f"Missing config file inside zip extraction: {root}")
+                logger.error(f"Missing config file inside zip extraction: {root}")
+                sys.exit(1)
             return hits[0].parent
 
         if extract_dir is None:

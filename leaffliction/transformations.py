@@ -83,7 +83,6 @@ class TransformationPipeline:
 
         self.set("grayscale_l", grayscale)
 
-        
 
         thresh = pcv.threshold.binary(gray_img=grayscale, threshold=threshold, object_type="light")
         thresh = _ensure_uint8(thresh)
@@ -538,7 +537,7 @@ class TransformationEngine:
             for p in paths_5:
                 ch = cv2.imread(str(p), cv2.IMREAD_GRAYSCALE)  # (H,W)
                 if ch is None:
-                    self.logger.warn(f"⚠️ Could not read: {p}")
+                    self.logger.warn(f"Could not read: {p}")
                     ok = False
                     break
 
@@ -575,16 +574,6 @@ class TransformationEngine:
         items: List[Tuple[Path, int]],
         transform_dir: Path
     ) -> List[Tuple[Path, int]]:
-        """
-        À partir d'items du dataset original (image_path, class_id),
-        retourne UNIQUEMENT les items correspondant aux images transformées
-        déjà générées dans transform_dir.
-
-        Hypothèses :
-        - transform_dir contient un mirroring exact de la structure source
-        - naming : <stem>_<TransformName>.png
-        """
-
         tf_names = [tf.name for tf in self.tfs]
         transformed_items: List[Tuple[Path, int]] = []
 
