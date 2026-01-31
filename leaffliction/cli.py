@@ -259,7 +259,7 @@ class ArgsManager:
         )
 
         parser.add_argument(
-            "--bundle-zip",
+            "--model-zip",
             type=Path,
             default=None,
             help="Path to the training bundle zip produced by train (optional)."
@@ -283,13 +283,6 @@ class ArgsManager:
             type=int,
             default=1,
             help="Show the top-k predicted classes (default: 1)."
-        )
-
-        parser.add_argument(
-            "--proba",
-            type=str,
-            default=None,
-            help="Save prediction probabilities/report to a .txt file (optional)."
         )
 
         parser.add_argument(
