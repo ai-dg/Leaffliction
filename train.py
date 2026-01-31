@@ -1,26 +1,36 @@
+"""
+Train a classification model on leaf disease images.
+
+This module provides the main entry point for training a plant disease
+classification model from the command line.
+"""
+
 from __future__ import annotations
-
 from pathlib import Path
-
 from leaffliction.cli import ArgsManager
 from leaffliction.dataset import DatasetScanner, DatasetSplitter
 from leaffliction.augmentations import AugmentationEngine
 from leaffliction.transformations import TransformationEngine
 from leaffliction.model import LabelMapper
 from leaffliction.train_pipeline import Trainer, TrainConfig, ModelChecker, TrainingPackager
-from leaffliction.utils import ZipPackager, Hasher
+from leaffliction.utils import ZipPackager, Hasher, Logger
 from leaffliction.plotting import Plotter
 
 
 def main() -> None:
+    """
+    Train a model from the command-line.
+    
+    Parses CLI arguments, prepares dataset, trains the model, plots metrics,
+    checks model validity, packages artifacts into a ZIP and writes a SHA1
+    signature file.
+    """
     parser = ArgsManager().build_train_parser()
     args = parser.parse_args()
-
     dataset_dir = Path(args.dataset_dir)
     out_dir = Path(getattr(args, "out_dir", "artifacts"))
     out_zip = Path(getattr(args, "out_zip", "learnings.zip"))
 
-    # Configuration pour PyTorch
     cfg = TrainConfig(
         epochs=getattr(args, "epochs", 50),
         batch_size=getattr(args, "batch_size", 32),
@@ -33,15 +43,12 @@ def main() -> None:
         augmentations_per_image=getattr(args, "aug_per_image", 3),
     )
 
-    # Composants
     scanner = DatasetScanner()
     splitter = DatasetSplitter()
     labels = LabelMapper()
     aug_engine = AugmentationEngine()
     tf_engine = TransformationEngine.trainning()
 
-
-    # Trainer PyTorch
     trainer = Trainer(
         dataset_scanner=scanner,
         dataset_splitter=splitter,
@@ -50,54 +57,41 @@ def main() -> None:
         labels=labels,
     )
 
-    print("=" * 60)
-    print("🍃 LEAFFLICTION - PyTorch Training Pipeline")
-    print("=" * 60)
-    print(f"   Dataset: {dataset_dir}")
-    print(f"   Augmentation: {'Enabled' if cfg.augment_train else 'Disabled'}")
-    print(f"   Validation ratio: {cfg.valid_ratio:.0%}")
-    print(f"   Epochs: {cfg.epochs}")
-    print(f"   Batch size: {cfg.batch_size}")
-    print("=" * 60)
-    print()
 
-    # Entraînement
+    logger = Logger()
+    logger.info("Training information:")
+    logger.info(f"   Dataset: {dataset_dir}")
+    logger.info(f"   Dataset: {dataset_dir}")
+    logger.info(f"   Augmentation: {'Enabled' if cfg.augment_train else 'Disabled'}")
+    logger.info(f"   Validation ratio: {cfg.valid_ratio:.0%}")
+    logger.info(f"   Epochs: {cfg.epochs}")
+    logger.info(f"   Batch size: {cfg.batch_size}")
+
     metrics = trainer.train(dataset_dir=dataset_dir, out_dir=out_dir, cfg=cfg)
     plotter = Plotter()
     plotter.plot_learning_curve(metrics.history_train_acc, metrics.history_valid_acc)
     plotter.plot_learning_curve_loss(metrics.history_train_loss)
 
+    checker = ModelChecker()
+    checker.assert_ok(metrics)
 
-    # Vérification des contraintes
-    gate = ModelChecker()
-    gate.assert_ok(metrics)
-
-    # Zip final
     packager = TrainingPackager(zip_packager=ZipPackager())
     artifacts_dir = packager.prepare_artifacts_dir(tmp_dir=out_dir)
     packager.build_zip(artifacts_dir=artifacts_dir, out_zip=out_zip)
 
-    # Signature SHA1
-    print("🔐 Generating signature...")
+    logger.info("Generating signature...")
     hasher = Hasher()
     signature = hasher.sha1_file(out_zip)
     signature_file = Path("signature.txt")
     signature_file.write_text(signature + "\n")
-    print(f"   Signature saved to {signature_file}")
-    print()
 
-    
-
-    print("=" * 60)
-    print("✅ Training completed successfully!")
-    print("=" * 60)
-    print(f"📊 Train accuracy: {metrics.train_accuracy:.2%}")
-    print(f"📊 Valid accuracy: {metrics.valid_accuracy:.2%}")
-    print(f"📊 Valid count: {metrics.valid_count}")
-    print(f"📦 Model bundle: {out_zip}")
-    print(f"🔐 Signature: {signature_file}")
-    print(f"   SHA1: {signature}")
-    print("=" * 60)
+    logger.info("Training completed successfully!")
+    logger.info(f"- Train accuracy: {metrics.train_accuracy:.2%}")
+    logger.info(f"- Valid accuracy: {metrics.valid_accuracy:.2%}")
+    logger.info(f"- Valid count: {metrics.valid_count}")
+    logger.info(f"- Model artifact: {out_zip}")
+    logger.info(f"- Signature: {signature_file}")
+    logger.info(f"   SHA1: {signature}")
 
 
 if __name__ == "__main__":
