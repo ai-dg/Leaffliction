@@ -1,3 +1,9 @@
+"""
+Utility classes for common operations across the pipeline.
+
+Provides path management (creation, iteration, mirroring), file hashing (SHA1),
+ZIP compression, and colored terminal logging.
+"""
 from __future__ import annotations
 
 from pathlib import Path
