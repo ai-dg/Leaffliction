@@ -142,7 +142,7 @@ class Trainer:
             valid_items = self.transformation_engine.extract_transformed_items(valid_items, transform_dir)
 
             logger.info(
-                f"Transforms extracted → "
+                f"Transforms extracted -> "
                 f"train: {len(train_items)}, valid: {len(valid_items)}"
             )
             
@@ -177,7 +177,7 @@ class Trainer:
         
         model_cfg = ModelConfig(
             num_classes=index.num_classes,
-            input_channels=X_train.shape[1],  # Nombre de transformations
+            input_channels=X_train.shape[1],
             img_size=cfg.img_size,
             seed=cfg.seed
         )
@@ -382,19 +382,21 @@ class ModelChecker:
     def assert_ok(self, metrics: Metrics) -> None:
         """
         Ensure metrics respect constraints.
-        Raises ValueError if non compliant.
+        Exit if non compliant.
         """
         
         if metrics.valid_accuracy < 0.90:
-            raise ValueError(
-                f"❌ Validation accuracy {metrics.valid_accuracy:.2%} < 90%. "
+            self.logger.error(
+                f"Validation accuracy {metrics.valid_accuracy:.2%} < 90%. "
                 f"Training failed to meet requirements."
             )
-        self.logger.info(f"   ✓ Validation accuracy: {metrics.valid_accuracy:.2%} >= 90%")
+            exit()
+        self.logger.info(f"   [OK] Validation accuracy: {metrics.valid_accuracy:.2%} >= 90%")
         
         if metrics.valid_count < 100:
-            raise ValueError(
-                f"❌ Validation set has {metrics.valid_count} images < 100. "
+            self.logger.error(
+                f"Validation set has {metrics.valid_count} images < 100. "
                 f"Increase dataset size or reduce valid_ratio."
             )
-        self.logger.info(f"   ✓ Validation set size: {metrics.valid_count} >= 100")
+            exit()
+        self.logger.info(f"   [OK] Validation set size: {metrics.valid_count} >= 100")
