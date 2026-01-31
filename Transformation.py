@@ -5,25 +5,25 @@ import cv2
 from plantcv import plantcv as pcv
 import numpy as np
 
-from leaffliction.cli import CLIBuilder
+from leaffliction.cli import ArgsManager
 from leaffliction.utils import PathManager
-from leaffliction.transformations import TransformationEngine, BatchTransformer
-from leaffliction.plotting import GridPlotter
+from leaffliction.transformations import TransformationEngine, TransformationDirectory
+from leaffliction.plotting import Plotter
 
 
 def main() -> None:
-    parser = CLIBuilder().build_transformation_parser()
+    parser = ArgsManager().build_transformation_parser()
     args = parser.parse_args()
 
     engine = TransformationEngine.default_six()
-    grid = GridPlotter()
+    grid = Plotter()
     pm = PathManager()
 
     # Mode batch: -src / -dst
     if getattr(args, "src", None) and getattr(args, "dst", None):
         src = Path(args.src)
         dst = Path(args.dst)
-        batch = BatchTransformer(engine=engine, path_manager=pm)
+        batch = TransformationDirectory(engine=engine, path_manager=pm)
         batch.run(src=src, dst=dst, recursive=getattr(args, "recursive", True))
         print(f"✅ Batch transformation completed: {src} → {dst}")
         return
@@ -45,7 +45,7 @@ def main() -> None:
     # pcv.plot_image(results['GaussianMask'])
 
     # Afficher la grille (original + 6 transformations)
-    grid.show_grid("Transformations", results, original=img)
+    grid.plot_grid("Transformations", results, original=img)
     
     print(f"\n✅ Transformations applied:")
     for name in results.keys():

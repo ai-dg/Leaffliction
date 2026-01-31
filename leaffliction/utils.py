@@ -146,3 +146,19 @@ class ZipPackager:
             format='zip',
             root_dir=src_dir
         )
+
+class Logger:
+    def __init__(self, verbose: bool = True):
+        self.verbose = verbose
+
+    def info(self, *args, **kwargs):
+        if self.verbose:
+            print("[INFO]", *args, **kwargs)
+
+    def warn(self, *args, **kwargs):
+        if self.verbose:
+            print("[WARN]", *args, **kwargs)
+
+    def error(self, *args, **kwargs):
+        if self.verbose:
+            print("[ERROR]", *args, **kwargs)

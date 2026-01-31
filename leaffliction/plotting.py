@@ -8,20 +8,25 @@ plt.style.use("./style/leaffliction.mplstyle")
 import numpy as np
 from math import ceil
 import cv2
+from leaffliction.utils import Logger
 
 
-
-class DistributionPlotter:
+class Plotter:
     """
     Pie chart + bar chart pour la distribution des classes.
     """
+    def __init__(self, verbose : bool = True):
+        self.verbose = verbose
 
-    def plot_pie(self, counts: Dict[str, int], title: str, save_to: Optional[Path] = None, verbose : bool = True) -> None:
+    def plot_pie(self, counts: Dict[str, int], title: str, save_to: Optional[str] = None) -> None:
+        vprint = Logger(self.verbose)
         counts_array = [value for key, value in counts.items()]
-        
-        print(f"Number of classes to plot : {len(counts_array)}")
+
+        vprint.info(f"Number of elements to classify: {sum([v for k, v in counts.items()])}")
+        vprint.info(f"Number of classes to plot : {len(counts_array)}")
         class_names = list(counts.keys())
-        print(f"{counts.keys()}")
+        for k, v in counts.items():
+            vprint.info(f"{k}:{v}")
 
         plt.figure()
         plt.pie(
@@ -34,16 +39,21 @@ class DistributionPlotter:
         plt.axis("equal")
 
         if save_to is not None:
-            plt.savefig(save_to, bbox_inches="tight")
+            plt.savefig(save_to + "/pie.png", bbox_inches="tight")
 
         plt.show()
         plt.close()
 
 
 
-    def plot_bar(self, counts: Dict[str, int], title: str, save_to: Optional[Path] = None) -> None:
+    def plot_bar(self, counts: Dict[str, int], title: str, save_to: Optional[str] = None) -> None:
+        vprint = Logger(self.verbose)
         counts_array = [value for key, value in counts.items()]
+        vprint.info(f"Number of elements to classify: {sum([v for k, v in counts.items()])}")
+        vprint.info(f"Number of classes to plot : {len(counts_array)}")
         class_names = list(counts.keys())
+        for k, v in counts.items():
+            vprint.info(f"{k}:{v}")
 
         plt.figure(figsize=(12, 17))
         plt.bar(class_names, counts_array)
@@ -58,7 +68,7 @@ class DistributionPlotter:
         plt.show()
         plt.close()
 
-    def plot_both(self, counts: Dict[str, int], title: str, save_to: Optional[Path] = None) -> None:
+    def plot_both(self, counts: Dict[str, int], title: str, save_to: Optional[str] = None) -> None:
         counts_array = list(counts.values())
         class_names = list(counts.keys())
 
@@ -123,12 +133,6 @@ class DistributionPlotter:
         plt.savefig("./learning curve_loss.jpg")
         plt.close()        
 
-
-class GridPlotter:
-    """
-    Affiche une grille (original + variantes).
-    Pratique pour Augmentation et Transformation.
-    """
     def _imshow_safe(self, img: np.ndarray) -> None:
         if img.ndim == 2:
             plt.imshow(img, cmap="gray", vmin=0, vmax=255)
@@ -146,7 +150,7 @@ class GridPlotter:
 
         plt.imshow(img)
 
-    def show_grid(
+    def plot_grid(
         self,
         title: str,
         images: Dict[str, np.ndarray],
@@ -202,7 +206,7 @@ def main():
 
     save_to = Path("plots")
 
-    distribution = DistributionPlotter()
+    distribution = Plotter()
 
     distribution.plot_pie(counts, title, save_to)
     distribution.plot_bar(counts, title, save_to)

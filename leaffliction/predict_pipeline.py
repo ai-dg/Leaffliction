@@ -8,19 +8,20 @@ import cv2
 import torch
 import sys
 import tempfile
-from leaffliction.model import PyTorchModelBundle
+from Distribution import DatasetScanner
+from leaffliction.model import InferenceManager
 
 
 @dataclass
 class PredictConfig:
     show_transforms: bool = True
     top_k: int = 3
-    extra: Dict[str, Any] = field(default_factory=dict)
+    extra: Dict[str, Any] = field(default=dict)
 
 
-class PyTorchPredictor:
-    def __init__(self, bundle_loader: PyTorchModelBundle, transformation_engine: Any) -> None:
-        self.bundle_loader = bundle_loader
+class Predictor:
+    def __init__(self, model_loader: InferenceManager, transformation_engine: Any) -> None:
+        self.model_loader = model_loader
         self.transformation_engine = transformation_engine
 
     def predict(
@@ -48,7 +49,7 @@ class PyTorchPredictor:
         print(f"bundle_zip={bundle_zip}")
         print(f"model_path={model_path}")
 
-        # 1) validation
+        # 1) validationvprint = Logger(self.verbose)
         if bundle_zip is None and model_path is None:
             raise ValueError("You must provide either bundle_zip or model_path")
 
@@ -62,7 +63,7 @@ class PyTorchPredictor:
 
             print("Loading model bundle from zip...")
             with tempfile.TemporaryDirectory() as temp_dir:
-                bundle = self.bundle_loader.load_from_zip(bundle_zip, Path(temp_dir))
+                bundle = self.model_loader.load_from_zip(bundle_zip, Path(temp_dir))
             print("   Model loaded successfully")
             print()
 
@@ -71,7 +72,7 @@ class PyTorchPredictor:
                 raise FileNotFoundError(f"Model path not found: {model_path}")
 
             print("Loading model bundle from directory...")
-            bundle = self.bundle_loader.load(model_path)
+            bundle = self.model_loader.load(model_path)
             print("   Model loaded successfully")
             print()
         
@@ -109,6 +110,19 @@ class PyTorchPredictor:
             transformed = self.transformation_engine.apply_all(img_resized)
         
         return predicted_label, probs, transformed
+    
+    def predict_with_dir(
+            self,
+            dir_path : Path,
+        ):
+        scanner = DatasetScanner()
+        index = scanner.scan(dir_path)
+        items = index.items
+
+
+
+
+
 
 
 class PredictionVisualiser:
@@ -124,10 +138,10 @@ class PredictionVisualiser:
         - Transformations (Grayscale, Canny, etc.)
         - Résultat de prédiction
         
-        Utilise GridPlotter pour l'affichage.
+        Utilise Plotter pour l'affichage.
         """
-        from leaffliction.plotting import GridPlotter
+        from leaffliction.plotting import Plotter
         
-        grid = GridPlotter()
+        grid = Plotter()
         title = f"Prediction: {predicted_label}"
-        grid.show_grid(title, transformed, original=original)
+        grid.plot_grid(title, transformed, original=original)

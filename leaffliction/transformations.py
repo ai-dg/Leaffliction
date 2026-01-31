@@ -37,7 +37,7 @@ def _to_gray_if_color(img: np.ndarray) -> np.ndarray:
 
 
 @dataclass
-class TFContext:
+class TransformationPipeline:
     img: np.ndarray  # BGR ou RGB, on ne touche pas ici
     cache: Dict[str, np.ndarray]
 
@@ -166,7 +166,7 @@ class Transformation(Protocol):
     def name(self) -> str:
         ...
 
-    def apply(self, ctx: TFContext) -> np.ndarray:
+    def apply(self, ctx: TransformationPipeline) -> np.ndarray:
         ...
 
 
@@ -175,7 +175,7 @@ class Transformation(Protocol):
 class NoBg:
     name: str = "NoBg"
 
-    def apply(self, ctx: TFContext) -> np.ndarray:
+    def apply(self, ctx: TransformationPipeline) -> np.ndarray:
         ctx.ensure_base()
         return ctx.get("img_no_bg")
 
@@ -184,7 +184,7 @@ class NoBg:
 class GrayscaleL:
     name: str = "GrayScale"
 
-    def apply(self, ctx: TFContext) -> np.ndarray:
+    def apply(self, ctx: TransformationPipeline) -> np.ndarray:
         ctx.ensure_base()
         return ctx.get("grayscale_l")
 
@@ -195,7 +195,7 @@ class Thresh:
     fill_size: int = 200
     name: str = "Thresh"
 
-    def apply(self, ctx: TFContext) -> np.ndarray:
+    def apply(self, ctx: TransformationPipeline) -> np.ndarray:
         ctx.ensure_base(threshold=self.threshold, fill_size=self.fill_size)
         return ctx.get("thresh")
 
@@ -206,7 +206,7 @@ class Filled:
     fill_size: int = 200
     name: str = "Filled"
 
-    def apply(self, ctx: TFContext) -> np.ndarray:
+    def apply(self, ctx: TransformationPipeline) -> np.ndarray:
         ctx.ensure_base(threshold=self.threshold, fill_size=self.fill_size)
         return ctx.get("filled")
 
@@ -217,7 +217,7 @@ class GaussianMask:
     fill_size: int = 200
     name: str = "GaussianMask"
 
-    def apply(self, ctx: TFContext) -> np.ndarray:
+    def apply(self, ctx: TransformationPipeline) -> np.ndarray:
         ctx.ensure_base(threshold=self.threshold, fill_size=self.fill_size)
         return ctx.get("gaussian")
 
@@ -228,7 +228,7 @@ class Masked:
     fill_size: int = 200
     name: str = "Masked"
 
-    def apply(self, ctx: TFContext) -> np.ndarray:
+    def apply(self, ctx: TransformationPipeline) -> np.ndarray:
         ctx.ensure_base(threshold=self.threshold, fill_size=self.fill_size)
         return ctx.get("masked")
 
@@ -236,7 +236,7 @@ class Masked:
 class Hue:
     name: str = "Hue"
 
-    def apply(self, ctx: TFContext) -> np.ndarray:
+    def apply(self, ctx: TransformationPipeline) -> np.ndarray:
         ctx.ensure_base()
         return ctx.get("hue")
 
@@ -246,7 +246,7 @@ class RoiImage:
     fill_size: int = 200
     name: str = "RoiImage"
 
-    def apply(self, ctx: TFContext) -> np.ndarray:
+    def apply(self, ctx: TransformationPipeline) -> np.ndarray:
         ctx.ensure_base(threshold=self.threshold, fill_size=self.fill_size)
         ctx.ensure_roi()
         return ctx.get("roi_image")
@@ -278,7 +278,7 @@ def _draw_pseudolandmarks(image: np.ndarray, pseudolandmarks, color_bgr, radius:
 class AnalyzeImage:
     name: str = "AnalyzeImage"
 
-    def apply(self, ctx: TFContext) -> np.ndarray:
+    def apply(self, ctx: TransformationPipeline) -> np.ndarray:
         ctx.ensure_base()
         ctx.ensure_roi()
 
@@ -302,7 +302,7 @@ class PseudoLandmarks:
     fill_size: int = 200
     name: str = "PseudoLandmarks"
 
-    def apply(self, ctx: TFContext) -> np.ndarray:
+    def apply(self, ctx: TransformationPipeline) -> np.ndarray:
         ctx.ensure_base(threshold=self.threshold, fill_size=self.fill_size)
         ctx.ensure_roi()
 
@@ -346,20 +346,28 @@ class TransformationEngine:
     @classmethod
     def default_six(cls) -> "TransformationEngine":
         tfs: List[Transformation] = [
-            # GrayscaleL(),
+            GrayscaleL(),
             Hue(),
-            # Thresh(threshold=35, fill_size=200),
-            # Filled(threshold=35, fill_size=200),
-            # GaussianMask(threshold=120, fill_size=200),
+            GaussianMask(threshold=120, fill_size=200),
             Masked(threshold=35, fill_size=200),
-            # RoiImage(),
+            RoiImage(),
+            AnalyzeImage(),
+            PseudoLandmarks(threshold=35, fill_size=200),
+        ]
+        return cls(tfs=tfs)
+    
+    @classmethod
+    def trainning(cls) -> "TransformationEngine":
+        tfs: List[Transformation] = [
+            Hue(),
+            Masked(threshold=35, fill_size=200),
             AnalyzeImage(),
             PseudoLandmarks(threshold=35, fill_size=200),
         ]
         return cls(tfs=tfs)
 
     def apply_all(self, img: np.ndarray) -> Dict[str, np.ndarray]:
-        ctx = TFContext(img=_ensure_uint8(img), cache={})
+        ctx = TransformationPipeline(img=_ensure_uint8(img), cache={})
 
         results: Dict[str, np.ndarray] = {}
         for tf in self.tfs:
@@ -371,7 +379,7 @@ class TransformationEngine:
         return results
 
     def apply_all_as_tensor(self, img: np.ndarray) -> torch.Tensor:
-        ctx = TFContext(img=_ensure_uint8(img), cache={})
+        ctx = TransformationPipeline(img=_ensure_uint8(img), cache={})
 
         channels: List[np.ndarray] = []
         for tf in self.tfs:
@@ -653,7 +661,7 @@ class TransformationEngine:
 
     
 
-class BatchTransformer:
+class TransformationDirectory:
     def __init__(self, engine: TransformationEngine) -> None:
         self.engine = engine
         self.pm = PathManager()
@@ -686,7 +694,7 @@ class BatchTransformer:
         recursive: bool = True
     ) -> List[Tuple[Path, int]]:
 
-        print(f"\n🚀 BatchTransformer.run")
+        print(f"\n🚀 TransformationDirectory.run")
         print(f"  src = {src}")
         print(f"  dst = {dst}")
         print(f"  recursive = {recursive}")
@@ -761,7 +769,7 @@ class BatchTransformer:
 
             # 7) compute ONLY missing transforms, keep ctx/cache consistent
             print("    🔄 Applying transformations")
-            ctx = TFContext(img=_ensure_uint8(img_rgb), cache={})
+            ctx = TransformationPipeline(img=_ensure_uint8(img_rgb), cache={})
 
             for tf in self.engine.tfs:
                 out_img = tf.apply(ctx)
@@ -788,7 +796,7 @@ class BatchTransformer:
             for name in tf_names:
                 items.append((out_dir / f"{stem}_{name}.png", class_id))
 
-        print(f"\n✅ BatchTransformer finished")
+        print(f"\n✅ TransformationDirectory finished")
         print(f"📦 Total transformed items returned: {len(items)}")
 
         return items

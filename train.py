@@ -2,18 +2,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from leaffliction.cli import CLIBuilder
+from leaffliction.cli import ArgsManager
 from leaffliction.dataset import DatasetScanner, DatasetSplitter
 from leaffliction.augmentations import AugmentationEngine
 from leaffliction.transformations import TransformationEngine
-from leaffliction.model import PyTorchModelFactory, LabelEncoder
-from leaffliction.train_pipeline import PyTorchTrainer, TrainConfig, RequirementsGate, TrainingPackager
+from leaffliction.model import LabelMapper
+from leaffliction.train_pipeline import Trainer, TrainConfig, ModelChecker, TrainingPackager
 from leaffliction.utils import ZipPackager, Hasher
-from leaffliction.plotting import DistributionPlotter
+from leaffliction.plotting import Plotter
 
 
 def main() -> None:
-    parser = CLIBuilder().build_train_parser()
+    parser = ArgsManager().build_train_parser()
     args = parser.parse_args()
 
     dataset_dir = Path(args.dataset_dir)
@@ -36,18 +36,17 @@ def main() -> None:
     # Composants
     scanner = DatasetScanner()
     splitter = DatasetSplitter()
-    labels = LabelEncoder()
+    labels = LabelMapper()
     aug_engine = AugmentationEngine()
-    tf_engine = TransformationEngine.default_six()
-    model_factory = PyTorchModelFactory()
+    tf_engine = TransformationEngine.trainning()
+
 
     # Trainer PyTorch
-    trainer = PyTorchTrainer(
+    trainer = Trainer(
         dataset_scanner=scanner,
         dataset_splitter=splitter,
         augmentation_engine=aug_engine,
         transformation_engine=tf_engine,
-        model_factory=model_factory,
         labels=labels,
     )
 
@@ -64,13 +63,13 @@ def main() -> None:
 
     # Entraînement
     metrics = trainer.train(dataset_dir=dataset_dir, out_dir=out_dir, cfg=cfg)
-    plotter = DistributionPlotter()
+    plotter = Plotter()
     plotter.plot_learning_curve(metrics.history_train_acc, metrics.history_valid_acc)
     plotter.plot_learning_curve_loss(metrics.history_train_loss)
 
 
     # Vérification des contraintes
-    gate = RequirementsGate()
+    gate = ModelChecker()
     gate.assert_ok(metrics)
 
     # Zip final

@@ -3,14 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 import cv2
 
-from leaffliction.cli import CLIBuilder
+from leaffliction.cli import ArgsManager
 from leaffliction.utils import PathManager
 from leaffliction.augmentations import AugmentationEngine, AugmentationSaver
-from leaffliction.plotting import GridPlotter
+from leaffliction.plotting import Plotter
 
 
 def main() -> None:
-    parser = CLIBuilder().build_augmentation_parser()
+    parser = ArgsManager().build_augmentation_parser()
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
@@ -27,8 +27,8 @@ def main() -> None:
     
     results = engine.apply_all(img)
 
-    grid = GridPlotter()
-    grid.show_grid("Augmentations", results, original=img)
+    grid = Plotter()
+    grid.plot_grid("Augmentations", results, original=img)
 
     pm = PathManager()
     saver = AugmentationSaver(pm)

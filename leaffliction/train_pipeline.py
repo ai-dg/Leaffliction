@@ -7,10 +7,11 @@ import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 
-from Transformation import BatchTransformer
+from Transformation import TransformationDirectory
 import sys
 from typing import Optional
 from leaffliction.model import ModelConfig
+from leaffliction.model import ConvolutionalNeuralNetwork
 
 @dataclass
 class TrainConfig:
@@ -24,7 +25,7 @@ class TrainConfig:
     augment_train: bool = True
     transform_train: bool = True
     augmentations_per_image: int = 3
-    extra: Dict[str, Any] = field(default_factory=dict)
+    extra: Dict[str, Any] = field(default=dict)
 
 
 @dataclass
@@ -35,11 +36,11 @@ class Metrics:
     history_valid_acc : Dict[int, int]
     history_train_acc : Dict[int, int]
     history_train_loss : Dict[int, int]    
-    notes: Dict[str, Any] = field(default_factory=dict)
+    notes: Dict[str, Any] = field(default=dict)
 
 
 
-class PyTorchTrainer:
+class Trainer:
     """
     Orchestrateur d'entraînement PyTorch.
     """
@@ -50,14 +51,12 @@ class PyTorchTrainer:
         dataset_splitter: Any, 
         augmentation_engine: Any,
         transformation_engine: Any,
-        model_factory: Any, 
         labels: Any
     ) -> None:
         self.dataset_scanner = dataset_scanner
         self.dataset_splitter = dataset_splitter
         self.augmentation_engine = augmentation_engine
         self.transformation_engine = transformation_engine
-        self.model_factory = model_factory
         self.labels = labels
 
     def train(self, dataset_dir: Path, out_dir: Path, cfg: TrainConfig) -> Metrics:
@@ -99,7 +98,7 @@ class PyTorchTrainer:
 
         if cfg.transform_train:
             transform_dir = out_dir / "transform"
-            batch_engine = BatchTransformer(self.transformation_engine)
+            batch_engine = TransformationDirectory(self.transformation_engine)
             batch_engine.run(dataset_dir, transform_dir)
 
             if aug_dir:
@@ -152,7 +151,10 @@ class PyTorchTrainer:
             img_size=cfg.img_size,
             seed=cfg.seed
         )
-        model = self.model_factory.build(model_cfg)
+        model = ConvolutionalNeuralNetwork(
+            num_classes=model_cfg.num_classes,
+            input_channels=model_cfg.input_channels
+        )
         
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         model.to(device)
@@ -276,8 +278,8 @@ class PyTorchTrainer:
         
         # 11. Sauvegarder bundle
         print("💾 Saving model...")
-        from leaffliction.model import PyTorchModelBundle
-        bundle = PyTorchModelBundle(
+        from leaffliction.model import InferenceManager
+        bundle = InferenceManager(
             model=model,
             labels=self.labels,
             transformation_engine=self.transformation_engine,
@@ -328,7 +330,7 @@ class TrainingPackager:
 
 
 
-class RequirementsGate:
+class ModelChecker:
     """
     Valide les contraintes du sujet:
     - valid_accuracy > 0.90

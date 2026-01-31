@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from leaffliction.cli import CLIBuilder
+from leaffliction.cli import ArgsManager
 from leaffliction.dataset import DatasetScanner
-from leaffliction.plotting import DistributionPlotter
+from leaffliction.plotting import Plotter
 
 
 def main() -> None:
-    parser = CLIBuilder().build_distribution_parser()
+    parser = ArgsManager().build_distribution_parser()
     args = parser.parse_args()
 
     dataset_dir = Path(args.dataset_dir)
@@ -18,13 +18,13 @@ def main() -> None:
 
     title = f"Dataset distribution: {index.root.name}"
 
-    plotter = DistributionPlotter()
+    plotter = Plotter(args.verbose)
     if args.mode == "both":
-        plotter.plot_both(index.counts, title)
+        plotter.plot_both(index.counts, title, save_to=args.save)
     if args.mode == "pie":
-        plotter.plot_pie(index.counts, title=title)
+        plotter.plot_pie(index.counts, title=title, save_to=args.save)
     if args.mode == "bar":
-        plotter.plot_bar(index.counts, title=title)
+        plotter.plot_bar(index.counts, title=title, save_to=args.save)
 
 
 if __name__ == "__main__":

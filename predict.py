@@ -6,14 +6,14 @@ import cv2
 import torch
 import sys
 
-from leaffliction.cli import CLIBuilder
-from leaffliction.predict_pipeline import PyTorchPredictor, PredictConfig
+from leaffliction.cli import ArgsManager
+from leaffliction.predict_pipeline import Predictor, PredictConfig
 from leaffliction.transformations import TransformationEngine
-from leaffliction.model import PyTorchModelBundle
+from leaffliction.model import InferenceManager
 
 
 def main() -> None:
-    parser = CLIBuilder().build_predict_parser()
+    parser = ArgsManager().build_predict_parser()
     args = parser.parse_args()
 
     bundle_zip: Path | None = args.bundle_zip
@@ -61,11 +61,11 @@ def main() -> None:
     )
 
     # Transformation engine
-    tf_engine = TransformationEngine.default_six()
+    tf_engine = TransformationEngine.trainning()
 
     # Predictor PyTorch
-    predictor = PyTorchPredictor(
-        bundle_loader=PyTorchModelBundle,
+    predictor = Predictor(
+        model_loader=InferenceManager,
         transformation_engine=tf_engine
     )
 
@@ -103,14 +103,14 @@ def main() -> None:
     # Affichage transformations (optionnel)
     if cfg.show_transforms and transformed:
         print("📊 Showing transformations...")
-        from leaffliction.plotting import GridPlotter
+        from leaffliction.plotting import Plotter
         
         # Charger image originale
         img = cv2.imread(str(image_path))
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         
-        grid = GridPlotter()
-        grid.show_grid(f"Transformations - Predicted: {predicted_label}", transformed, original=img)
+        grid = Plotter()
+        grid.plot_grid(f"Transformations - Predicted: {predicted_label}", transformed, original=img)
 
 
 if __name__ == "__main__":

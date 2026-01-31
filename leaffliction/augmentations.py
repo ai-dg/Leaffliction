@@ -26,6 +26,9 @@ class AugmentationEngine:
     to disk as new dataset items.
     """
 
+    def __init__(self, verbose: bool = True):
+        self.verbose = verbose
+
     augs_demo = {
         "Rotate": A.Rotate(
             limit=(-15, 15),
@@ -184,6 +187,23 @@ class AugmentationEngine:
     #     return train_items
 
     def augment_dataset(self, train_items, seed, dataset_dir, output_dir):
+        """
+        Augment the training dataset to balance class distributions.
+
+        For each under-represented class, augmentations are applied
+        iteratively to existing images until the class reaches the
+        target number of samples. If all images are exhausted and the
+        deficit remains, the process restarts with randomized transforms.
+
+        Args:
+            train_items: Training set as (image_path, class_id) tuples.
+            seed: Random seed for reproducible shuffling.
+            dataset_dir: Root directory of the original dataset
+            output_dir: Root directory where augmented images are saved.
+
+        Returns:
+            The augmented training set, including newly generated samples.
+        """
         pm = PathManager()
 
         train_items_grouped = defaultdict(list)
@@ -223,7 +243,7 @@ class AugmentationEngine:
                 pm.ensure_dir(augm_path.parent)
 
                 if augm_path.exists():
-                    # fichier déjà présent: on peut l’ajouter, il est valide
+
                     augmented_items.append((augm_path, class_id))
                     continue
 

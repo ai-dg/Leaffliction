@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 
 
-class CLIBuilder:
+class ArgsManager:
     """
     Centralise argparse pour éviter duplication dans les entrypoints root.
     Tu peux faire 5 méthodes: distribution, augmentation, transformation, train, predict.
@@ -38,6 +38,13 @@ class CLIBuilder:
             choices=["both", "bar", "pie"],
             default="both",
             help="Choose type of graph for distribution"
+        )
+
+        parser.add_argument(
+            "--save",
+            type=str,
+            default=None,
+            help="Choose the directory to save the fig"
         )
 
         parser.add_argument(

@@ -21,7 +21,7 @@ class ModelConfig:
     input_channels: int = 7  # Nombre de transformations
     img_size: Tuple[int, int] = (224, 224)
     seed: int = 42
-    extra: Dict[str, Any] = field(default_factory=dict)
+    extra: Dict[str, Any] = field(default=dict)
 
 
 @dataclass
@@ -32,7 +32,7 @@ class ModelPaths:
     config_file: str = "config.json"
 
 
-class LabelEncoder:
+class LabelMapper:
     """
     Mapping stable:
       class_name -> id
@@ -68,7 +68,7 @@ class LabelEncoder:
         return {"class_to_id": self.class_to_id}
 
     @classmethod
-    def from_json_dict(cls, data: Dict[str, Any]) -> "LabelEncoder":
+    def from_json_dict(cls, data: Dict[str, Any]) -> "LabelMapper":
         """Désérialise depuis un dict JSON"""
         enc = cls()
         c2i = data.get("class_to_id", {})
@@ -80,7 +80,7 @@ class LabelEncoder:
         return enc
 
 
-class TransformationClassifier(nn.Module):
+class ConvolutionalNeuralNetwork(nn.Module):
     """
     Modèle PyTorch qui prend les transformations en entrée.
     Input: (batch, n_transforms, H, W) où n_transforms = 6
@@ -122,20 +122,6 @@ class TransformationClassifier(nn.Module):
         x = self.classifier(x)
         return x
 
-
-class PyTorchModelFactory:
-    """
-    Construit un modèle PyTorch.
-    """
-
-    def build(self, cfg: ModelConfig) -> TransformationClassifier:
-        model = TransformationClassifier(
-            num_classes=cfg.num_classes,
-            input_channels=cfg.input_channels
-        )
-        return model
-
-
 def _set_seed(seed: int) -> None:
     random.seed(seed)
     np.random.seed(seed)
@@ -144,15 +130,15 @@ def _set_seed(seed: int) -> None:
         torch.cuda.manual_seed_all(seed)
 
 
-class PyTorchModelBundle:
+class InferenceManager:
     """
     Bundle complet pour sauvegarder/charger un modèle PyTorch.
     """
 
     def __init__(
         self,
-        model: TransformationClassifier,
-        labels: LabelEncoder,
+        model: ConvolutionalNeuralNetwork,
+        labels: LabelMapper,
         transformation_engine: Any,  # TransformationEngine
         cfg: ModelConfig,
         paths: Optional[ModelPaths] = None
@@ -196,7 +182,7 @@ class PyTorchModelBundle:
         torch.save(self.model.state_dict(), model_path)
 
     @classmethod
-    def load(cls, in_dir: Path) -> "PyTorchModelBundle":
+    def load(cls, in_dir: Path) -> "InferenceManager":
         """
         Charge le bundle depuis in_dir/
         Note: ne peut pas reconstruire transformation_engine sans ta factory -> on met None par défaut.
@@ -228,11 +214,13 @@ class PyTorchModelBundle:
 
         # 2) labels
         labels_data = json.loads(labels_path.read_text(encoding="utf-8"))
-        labels = LabelEncoder.from_json_dict(labels_data)
+        labels = LabelMapper.from_json_dict(labels_data)
 
-        # 3) model
-        factory = PyTorchModelFactory()
-        model = factory.build(cfg)
+
+        model = model = ConvolutionalNeuralNetwork(
+            num_classes=cfg.num_classes,
+            input_channels=cfg.input_channels
+        )
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         state = torch.load(model_path, map_location=device)
@@ -245,7 +233,7 @@ class PyTorchModelBundle:
         return bundle
 
     @classmethod
-    def load_from_zip(cls, zip_path: Path, extract_dir: Optional[Path] = None) -> "PyTorchModelBundle":
+    def load_from_zip(cls, zip_path: Path, extract_dir: Optional[Path] = None) -> "InferenceManager":
         zip_path = Path(zip_path)
         if not zip_path.exists():
             raise FileNotFoundError(f"Zip not found: {zip_path}")
