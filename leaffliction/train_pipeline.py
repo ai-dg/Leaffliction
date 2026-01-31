@@ -372,8 +372,8 @@ class TrainingPackager:
 class ModelChecker:
     """
     Validates trained model against project constraints:
-    - Validation accuracy ≥ 90%
-    - Validation set size ≥ 100
+    - Validation accuracy >= 90%
+    - Validation set size >= 100
     """
 
     def __init__(self, verbose: bool = True):

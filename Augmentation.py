@@ -1,3 +1,8 @@
+"""Apply image augmentations to a single image and save results.
+
+Provides command-line interface for testing augmentation transforms,
+visualizing results in a grid, and saving augmented images to disk.
+"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -10,6 +15,12 @@ from leaffliction.plotting import Plotter
 from leaffliction.utils import Logger
 
 def main() -> None:
+    """
+    Apply augmentations to a single image from the command-line.
+    
+    Parses CLI arguments, loads the image, applies augmentation transforms,
+    displays results in a grid, and saves augmented images to disk.
+    """
     parser = ArgsManager().build_augmentation_parser()
     args = parser.parse_args()
 

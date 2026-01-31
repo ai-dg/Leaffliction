@@ -1,3 +1,8 @@
+"""Image augmentation and dataset balancing through transforms.
+
+Provides augmentation engine for applying transforms (rotation, blur, contrast, etc.),
+saving augmented images, and balancing datasets by oversampling under-represented classes.
+"""
 from __future__ import annotations
 
 from pathlib import Path
