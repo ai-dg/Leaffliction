@@ -1,3 +1,9 @@
+"""
+Training pipeline orchestration.
+
+Provides configuration, metrics tracking, model training, validation,
+artifact packaging, and model quality checks.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -67,9 +73,10 @@ class Metrics:
 
 class Trainer:
     """
-    Training Orchestrator.
-
-    Execute the full training pipeline.
+    Training orchestrator for the full ML pipeline.
+    
+    Handles dataset scanning, splitting, augmentation, transformation, 
+    model training, and evaluation.
     """
 
     def __init__(
@@ -86,7 +93,6 @@ class Trainer:
         self.augmentation_engine = augmentation_engine
         self.transformation_engine = transformation_engine
         self.labels = labels
-        self.verbose = verbose
         self.logger = Logger(verbose)
 
     def train(self, dataset_dir: Path, out_dir: Path, cfg: TrainConfig) -> Metrics:
@@ -96,7 +102,7 @@ class Trainer:
         
         self.labels.fit(index.class_names)
         
-        print("✂️  Splitting dataset...")
+        logger.info("Splitting dataset...")
         train_items, valid_items = self.dataset_splitter.split(
             index.items,
             cfg.valid_ratio,
@@ -104,9 +110,7 @@ class Trainer:
             stratified=True
         )
         logger.info(
-            f"Dataset split:"
-            f"   Train: {len(train_items)} images"
-            f"   Valid: {len(valid_items)} images"
+            f"Dataset split: Train: {len(train_items)} images, Valid: {len(valid_items)} images"
         )
 
         X_train = None
@@ -137,8 +141,8 @@ class Trainer:
             train_items = self.transformation_engine.extract_transformed_items(train_items, transform_dir)
             valid_items = self.transformation_engine.extract_transformed_items(valid_items, transform_dir)
 
-            print(
-                f"Transforms extracted → "
+            logger.info(
+                f"Transforms extracted -> "
                 f"train: {len(train_items)}, valid: {len(valid_items)}"
             )
             
@@ -152,7 +156,7 @@ class Trainer:
             raise ValueError("X_train must be initialized before use")
 
 
-        print("📦 Creating DataLoaders...")
+        logger.info("Creating DataLoaders...")
         train_dataset = TensorDataset(X_train, y_train)
         valid_dataset = TensorDataset(X_valid, y_valid)
         
@@ -166,18 +170,14 @@ class Trainer:
             batch_size=cfg.batch_size, 
             shuffle=False
         )
-        print(f"   Train batches: {len(train_loader)}")
-        print(f"   Valid batches: {len(valid_loader)}")
-        print()
+        logger.info(f"   Train batches: {len(train_loader)}")
+        logger.info(f"   Valid batches: {len(valid_loader)}")
 
-        print(f"Number of channels: {X_train.shape[1]}")
-        
-        # 7. Construire modèle
-        print("🤖 Building PyTorch model...")
+        logger.info(f"Number of channels: {X_train.shape[1]}")
         
         model_cfg = ModelConfig(
             num_classes=index.num_classes,
-            input_channels=X_train.shape[1],  # Nombre de transformations
+            input_channels=X_train.shape[1],
             img_size=cfg.img_size,
             seed=cfg.seed
         )
@@ -188,13 +188,11 @@ class Trainer:
         
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         model.to(device)
-        print(f"   Model: {type(model).__name__}")
-        print(f"   Device: {device}")
-        print(f"   Parameters: {sum(p.numel() for p in model.parameters()):,}")
-        print()
+        logger.info(f"Model: {type(model).__name__}")
+        logger.info(f"Device: {device}")
+        logger.info(f"Parameters: {sum(p.numel() for p in model.parameters()):,}")
         
-        # 8. Entraîner
-        print("🚀 Training model...")
+        logger.info("Training model...")
         import time
         start_time = time.time()
         
@@ -212,7 +210,6 @@ class Trainer:
         
         
         for epoch in range(cfg.epochs):
-            # Training
             model.train()
             train_loss = 0.0
             train_correct = 0
@@ -256,17 +253,16 @@ class Trainer:
                 torch.save(model.state_dict(), out_dir / "best_model.pth")
             
             if (epoch + 1) % 5 == 0 or epoch == 0:
-                print(f"   Epoch {epoch+1}/{cfg.epochs} - "
-                      f"Train Acc: {train_acc:.2%} - "
-                      f"Valid Acc: {valid_acc:.2%}")
+                logger.info(f"   Epoch {epoch+1}/{cfg.epochs} - "
+                                f"Train Acc: {train_acc:.2%} - "
+                                f"Valid Acc: {valid_acc:.2%}")
         
         training_time = time.time() - start_time
-        print(f"   Training completed in {training_time:.1f}s")
-        print()
+        logger.info(f"   Training completed in {training_time:.1f}s")
         
         model.load_state_dict(torch.load(out_dir / "best_model.pth"))
         
-        print("📈 Final evaluation...")
+        logger.info("Final evaluation...")
         model.eval()
         train_correct = 0
         valid_correct = 0
@@ -287,9 +283,8 @@ class Trainer:
         train_acc = train_correct / len(train_dataset)
         valid_acc = valid_correct / len(valid_dataset)
         
-        print(f"   Train accuracy: {train_acc:.2%}")
-        print(f"   Valid accuracy: {valid_acc:.2%}")
-        print()
+        logger.info(f"   Train accuracy: {train_acc:.2%}")
+        logger.info(f"   Valid accuracy: {valid_acc:.2%}")
         
         metrics = Metrics(
             train_accuracy=train_acc,
@@ -306,46 +301,53 @@ class Trainer:
             }
         )
         
-        # 11. Sauvegarder bundle
-        print("💾 Saving model...")
+        logger.info("Saving model...")
         from leaffliction.model import InferenceManager
-        bundle = InferenceManager(
+        inference = InferenceManager(
             model=model,
             labels=self.labels,
             transformation_engine=self.transformation_engine,
             cfg=model_cfg
         )
-        bundle.save(out_dir / "model")
-        print(f"   Model saved to {out_dir / 'model'}")
-        print()
+        inference.save(out_dir / "model")
+        logger.info(f"   Model saved to {out_dir / 'model'}")
         
         return metrics
 
 
 class TrainingPackager:
     """
-    Prépare les artefacts puis zip le tout.
+    Prepares and packages training artifacts into a zip file.
     """
 
-    def __init__(self, zip_packager: Any) -> None:
+    def __init__(
+            self,
+            zip_packager: Any,
+            verbose: bool = True
+            ) -> None:
         self.zip_packager = zip_packager
+        self.logger = Logger(verbose)
 
     def prepare_artifacts_dir(self, tmp_dir: Path) -> Path:
         """
-        Prépare le dossier d'artefacts à zipper.
-        Pour PyTorch: model/
+        Prepare the artificats directory to be zipped.
+
+        It creates the 'artificats' directory if it doesn't exist.
+        A 'model' is created under that directory, whom purpose is
+        to contain the model artificats.
+
+        Args:
+            tmp_dir: the parent directory of the 'artifacts' directory.
         """
         
 
         artifacts_dir = tmp_dir / "artifacts"
         artifacts_dir.mkdir(parents=True, exist_ok=True)
 
-        # Copier le dossier model/
         model_dir = tmp_dir / "model"
         dst_model_dir = artifacts_dir / "model"
 
         if model_dir.exists():
-            # 🔥 Si destination existe, on la supprime pour éviter FileExistsError
             if dst_model_dir.exists():
                 shutil.rmtree(dst_model_dir)
 
@@ -354,39 +356,47 @@ class TrainingPackager:
         return artifacts_dir
 
     def build_zip(self, artifacts_dir: Path, out_zip: Path) -> None:
-        print("📦 Creating learnings.zip...")
+        """
+        Zips the artificat directory
+        
+        Args:
+            artifacts_dir: Path of the 'artifacts' directory
+            out_zip: Output Path of the zip archive.
+        """
+        self.logger.info("Creating learnings.zip...")
         self.zip_packager.zip_dir(artifacts_dir, out_zip)
-        print(f"   ZIP created: {out_zip}")
+        self.logger.info(f"   ZIP created: {out_zip}")
 
 
 
 class ModelChecker:
     """
-    Valide les contraintes du sujet:
-    - valid_accuracy > 0.90
-    - valid_count >= 100
+    Validates trained model against project constraints:
+    - Validation accuracy >= 90%
+    - Validation set size >= 100
     """
+
+    def __init__(self, verbose: bool = True):
+        self.logger = Logger(verbose)
 
     def assert_ok(self, metrics: Metrics) -> None:
         """
-        Vérifie que les métriques respectent les contraintes.
-        Lève ValueError si non conforme.
+        Ensure metrics respect constraints.
+        Exit if non compliant.
         """
-        print("✅ Checking requirements...")
         
-        # Contrainte 1: accuracy > 90%
         if metrics.valid_accuracy < 0.90:
-            raise ValueError(
-                f"❌ Validation accuracy {metrics.valid_accuracy:.2%} < 90%. "
-                f"TraiZipPackagerning failed to meet requirements."
+            self.logger.error(
+                f"Validation accuracy {metrics.valid_accuracy:.2%} < 90%. "
+                f"Training failed to meet requirements."
             )
-        print(f"   ✓ Validation accuracy: {metrics.valid_accuracy:.2%} >= 90%")
+            exit()
+        self.logger.info(f"   [OK] Validation accuracy: {metrics.valid_accuracy:.2%} >= 90%")
         
-        # Contrainte 2: validation set >= 100 images
         if metrics.valid_count < 100:
-            raise ValueError(
-                f"❌ Validation set has {metrics.valid_count} images < 100. "
+            self.logger.error(
+                f"Validation set has {metrics.valid_count} images < 100. "
                 f"Increase dataset size or reduce valid_ratio."
             )
-        print(f"   ✓ Validation set size: {metrics.valid_count} >= 100")
-        print()
+            exit()
+        self.logger.info(f"   [OK] Validation set size: {metrics.valid_count} >= 100")

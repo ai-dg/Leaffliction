@@ -174,21 +174,6 @@ class ArgsManager:
         )
 
         parser.add_argument(
-            "--loss",
-            type=str,
-            default="cce",
-            choices=["cce", "bce", "mse"],
-            help="Loss function (default: cce)."
-        )
-
-        parser.add_argument(
-            "--layers",
-            type=int,
-            nargs="+",
-            help="Hidden layer sizes, e.g. --layers 24 24 24."
-        )
-
-        parser.add_argument(
             "--epochs",
             type=int,
             default=70,
@@ -200,42 +185,6 @@ class ArgsManager:
             type=int,
             default=8,
             help="Batch size (default: 8)."
-        )
-
-        parser.add_argument(
-            "--optimizer",
-            type=str,
-            default="Adam",
-            choices=["SGD", "Adam"],
-            help="Optimizer to use (default: Adam)."
-        )
-
-        parser.add_argument(
-            "--metrics",
-            type=str,
-            nargs="*",
-            default=["Accuracy"],
-            help='Metrics to evaluate during training (default: ["Accuracy"]).'
-        )
-
-        parser.add_argument(
-            "--early-stopping",
-            action="store_true",
-            help="Enable early stopping."
-        )
-
-        parser.add_argument(
-            "--patience",
-            type=int,
-            default=5,
-            help="Patience for early stopping (default: 5)."
-        )
-
-        parser.add_argument(
-            "--min-delta",
-            type=float,
-            default=0.0,
-            help="Minimum improvement to qualify as progress for early stopping (default: 0.0)."
         )
 
         parser.add_argument(
