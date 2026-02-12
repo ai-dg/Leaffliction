@@ -1,8 +1,10 @@
 # Leaffliction
-
+![Score](https://img.shields.io/badge/Score-125%25-brightgreen)  
 **Image classification by disease recognition on leaves**
 
 A PyTorch pipeline for multi-class classification of plant leaf diseases (e.g. Apple and Grape) using a custom CNN, image augmentations, and hand-crafted visual transformations (Hue, Masked, AnalyzeImage, PseudoLandmarks) as input channels.
+
+**Réalisateurs :** [ai-dg](https://github.com/ai-dg) · [s-t-e-v](https://github.com/s-t-e-v) · **Repo :** [github.com/ai-dg/Leaffliction](https://github.com/ai-dg/Leaffliction)
 
 ---
 
@@ -253,12 +255,14 @@ Validation accuracy is required to be ≥ 90% and validation set size ≥ 100 (e
 
 ## ▌ Learning Curves
 
-Learning curves are generated at the end of training:
+Learning curves are generated at the end of training and saved in the project root. Summary:
 
-- **Accuracy (train vs valid):** `plot_learning_curve(history_train_acc, history_valid_acc)` → saved as `./learning curve.jpg`.
-- **Train loss:** `plot_learning_curve_loss(history_train_loss)` → saved as `./learning curve_loss.jpg`.
+| Curve | Description | Figure |
+|-------|-------------|--------|
+| **Accuracy (train vs valid)** | `plot_learning_curve(history_train_acc, history_valid_acc)` → `learning curve.jpg` | ![Train/valid accuracy](learning%20curve.jpg) |
+| **Train loss** | `plot_learning_curve_loss(history_train_loss)` → `learning curve_loss.jpg` | ![Train loss](learning%20curve_loss.jpg) |
 
-They are written in the project root by default. For headless environments (e.g. no Tk), set:
+For headless environments (e.g. no Tk), set:
 
 ```bash
 MPLBACKEND=Agg python train.py ./leaves/images

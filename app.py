@@ -44,25 +44,28 @@ EXAMPLE_DIRS = [
 SUPPORTED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG"}
 
 
-def _get_example_images() -> Tuple[List[List[str]], List[str]]:
+def _get_example_data() -> Tuple[List[str], Dict[str, Path]]:
     """
-    Return (list of [path] for gr.Examples, list of display names in same order).
-    Only includes existing files. Display name is just the basename (no Unit_test1/2).
+    Return (list of display names, mapping name -> file path).
+    Used for the sample dropdown; images are loaded on the server when selected
+    so they display correctly in the output (no broken Gradio temp URL in upload area).
     """
-    out: List[List[str]] = []
     names: List[str] = []
+    name_to_path: Dict[str, Path] = {}
     for dir_path in EXAMPLE_DIRS:
         if not dir_path.is_dir():
             continue
         for p in sorted(dir_path.iterdir()):
             if p.suffix in SUPPORTED_IMAGE_EXTENSIONS and p.is_file():
-                out.append([str(p.resolve())])
                 names.append(p.name)
-    return out, names
+                name_to_path[p.name] = p
+    return names, name_to_path
 
 # Loaded at startup (None if model dir missing or invalid)
 _loader: Optional[InferenceManager] = None
 _transformation_engine: Optional[TransformationEngine] = None
+# Sample name -> path for dropdown (set in build_ui)
+_sample_name_to_path: Dict[str, Path] = {}
 
 
 def _load_model_cpu(model_dir: Path) -> Optional[InferenceManager]:
@@ -198,14 +201,68 @@ def run_interface(image: Any) -> Tuple[Optional[np.ndarray], str, str, str]:
     return orig, label, conf_str, top_k_str
 
 
+def run_sample(selected_name: Optional[str]) -> Tuple[Optional[np.ndarray], str, str, str]:
+    """
+    Run prediction when user selects a sample from the dropdown.
+    Loads the image from disk and returns (image, label, confidence, top-k).
+    Image is shown in the output panel only (avoids broken display in upload area).
+    """
+    if not selected_name or not selected_name.strip():
+        return None, "—", "—", "—"
+    path = _sample_name_to_path.get(selected_name.strip())
+    if path is None or not path.exists():
+        return None, "—", "—", f"Sample not found: {selected_name}"
+    img = cv2.imread(str(path))
+    if img is None:
+        return None, "—", "—", f"Could not load: {path.name}"
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    orig, label, conf, top_k = predict_from_image(img_rgb)
+    conf_str = f"{conf:.1%}" if isinstance(conf, (int, float)) else str(conf)
+    top_k_str = "\n".join(f"{name}: {p:.1%}" for name, p in top_k) if top_k else "—"
+    return orig, label, conf_str, top_k_str
+
+
 # -----------------------------------------------------------------------------
 # Gradio UI (Blocks)
 # -----------------------------------------------------------------------------
 
-MODEL_DETAILS_MD = """
-- **Architecture:** Custom CNN (*ConvolutionalNeuralNetwork*): 4× (Conv2d → ReLU → MaxPool2d), AdaptiveAvgPool2d(1), Linear(256→128) → ReLU → Dropout(0.5) → Linear(128→num_classes). Input: 4-channel transformed images, 224×224.
-- **Validation accuracy (reference run):** 98.06% (best checkpoint); train accuracy 99.98%. Training: 70 epochs, capacity=0.5 on train set, stratified 80/20 split.
-- **Training data:** Leaf images grouped by class (Apple/Grape diseases and healthy). Augmentation (rotation, blur, contrast, etc.) and 4 visual transforms (Hue, Masked, AnalyzeImage, PseudoLandmarks) used to build the 4-channel input.
+MODEL_ARCHITECTURE_MD = """
+**Architecture** (`leaffliction.model.ConvolutionalNeuralNetwork`)
+
+```python
+features = Sequential(
+    Conv2d(in_ch=4, out=32, k=3, padding=1), ReLU(), MaxPool2d(2),   # block 1
+    Conv2d(32, 64, 3, padding=1), ReLU(), MaxPool2d(2),              # block 2
+    Conv2d(64, 128, 3, padding=1), ReLU(), MaxPool2d(2),             # block 3
+    Conv2d(128, 256, 3, padding=1), ReLU(), MaxPool2d(2),            # block 4
+)
+gap = AdaptiveAvgPool2d(1)
+classifier = Sequential(Flatten(), Linear(256, 128), ReLU(), Dropout(0.5), Linear(128, num_classes))
+# Input: 4-channel transformed images, 224×224
+```
+"""
+
+MODEL_VALIDATION_MD = """
+**Validation (reference run)**
+
+| Metric | Value |
+|--------|-------|
+| Valid accuracy (best checkpoint) | 98.06 % |
+| Train accuracy | 99.98 % |
+| Epochs | 70 |
+| Split | Stratified 80 % train / 20 % valid |
+| Transforms extracted (train) | 41,984 |
+| Transforms extracted (valid) | 5,768 |
+| Groups (train, complete 4 transforms) | 10,496 |
+| **Capacity 50 %** | **5,248** train samples (656 per class out of 1,312 before limit) |
+"""
+
+MODEL_TRAINING_MD = """
+**Training data**
+
+- **Classes:** 8 (Apple/Grape diseases and healthy).
+- **Augmentation:** rotation, blur, contrast, scaling, illumination, perspective (Albumentations).
+- **Transforms (4 channels):** Hue, Masked, AnalyzeImage, PseudoLandmarks → 4-channel input, 224×224.
 """
 
 
@@ -213,7 +270,16 @@ def build_ui() -> gr.Blocks:
     with gr.Blocks(
         title="Leaffliction — Leaf Disease Classification",
         theme=gr.themes.Soft(),
-        css="footer {text-align: center; margin-top: 1em;}",
+        css=(
+            "footer {text-align: center; margin-top: 1em;} "
+            ".upload-container.reduced-height { min-height: 380px !important; height: auto !important; } "
+            ".upload-container .image-frame, .image-container .image-frame { "
+            "min-height: 360px !important; display: flex !important; align-items: center !important; justify-content: center !important; } "
+            ".upload-container .image-frame img, .image-container .image-frame img { "
+            "min-width: 320px !important; min-height: 320px !important; max-width: 100% !important; "
+            "width: auto !important; height: auto !important; object-fit: contain !important; "
+            "}"
+        ),
     ) as demo:
         gr.Markdown(
             """
@@ -227,7 +293,10 @@ def build_ui() -> gr.Blocks:
             "**Supported:** Apple & Grape leaf diseases and healthy leaves. Best results with clear, single-leaf photos."
         )
 
-        example_images, example_names = _get_example_images()
+        example_names, name_to_path = _get_example_data()
+        _sample_name_to_path.clear()
+        _sample_name_to_path.update(name_to_path)
+        sample_dropdown: Optional[gr.Dropdown] = None
 
         with gr.Row():
             with gr.Column(scale=1):
@@ -235,10 +304,17 @@ def build_ui() -> gr.Blocks:
                     type="numpy",
                     label="Upload leaf image",
                     sources=["upload", "clipboard"],
+                    height=400,
                 )
                 run_btn = gr.Button("Predict", variant="primary")
+                if example_names:
+                    sample_dropdown = gr.Dropdown(
+                        choices=[""] + example_names,
+                        value="",
+                        label="Or pick a sample image",
+                    )
             with gr.Column(scale=1):
-                image_out = gr.Image(label="Original image", interactive=False)
+                image_out = gr.Image(label="Original image", interactive=False, height=400)
                 label_out = gr.Textbox(label="Predicted class", interactive=False)
                 confidence_out = gr.Textbox(label="Confidence", interactive=False)
                 top_k_out = gr.Textbox(
@@ -257,18 +333,11 @@ def build_ui() -> gr.Blocks:
             inputs=[image_in],
             outputs=[image_out, label_out, confidence_out, top_k_out],
         )
-        if example_images and example_names:
-            gr.Markdown(
-                "**Sample images (click one):**  "
-                + "  ·  ".join(f"*{n}*" for n in example_names)
-            )
-            gr.Examples(
-                examples=example_images,
-                inputs=image_in,
+        if example_names and sample_dropdown is not None:
+            sample_dropdown.change(
+                fn=run_sample,
+                inputs=[sample_dropdown],
                 outputs=[image_out, label_out, confidence_out, top_k_out],
-                fn=run_interface,
-                label="",
-                run_on_click=True,
             )
 
         gr.Markdown("---")
@@ -278,15 +347,19 @@ def build_ui() -> gr.Blocks:
         )
 
         with gr.Accordion("Model Details", open=False):
-            gr.Markdown(MODEL_DETAILS_MD)
+            gr.Markdown(MODEL_ARCHITECTURE_MD)
+            gr.Markdown(MODEL_VALIDATION_MD)
+            gr.Markdown(MODEL_TRAINING_MD)
 
         gr.Markdown("---")
         gr.Markdown(
             """
+            **Authors** · [ai-dg](https://github.com/ai-dg) · [s-t-e-v](https://github.com/s-t-e-v)
+
             **Links**
-            - 📂 [GitHub repository](https://github.com/username/Leaffliction)  *(replace `username` with your GitHub org/user)*
-            - 📓 [Binder notebook (predict_demo)](https://mybinder.org/v2/gh/username/Leaffliction/HEAD?labpath=predict_demo.ipynb)  *(replace `username`)*
-            - 🌐 [Portfolio](https://example.com)  *(placeholder — set your URL)*
+            - 📂 [GitHub repository](https://github.com/ai-dg/Leaffliction)
+            - 📓 [Binder notebook (predict_demo)](https://mybinder.org/v2/gh/ai-dg/Leaffliction/HEAD?labpath=predict_demo.ipynb)
+            - 🌐 [Portfolio](https://dagudelo.dev/)
             """
         )
 
