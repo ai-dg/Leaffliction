@@ -255,12 +255,11 @@ Validation accuracy is required to be ≥ 90% and validation set size ≥ 100 (e
 
 ## ▌ Learning Curves
 
-Learning curves are generated at the end of training and saved in the project root. Summary:
+Learning curves are generated at the end of training and saved in the project root (`learning curve.jpg`, `learning curve_loss.jpg`).
 
-| Curve | Description | Figure |
-|-------|-------------|--------|
-| **Accuracy (train vs valid)** | `plot_learning_curve(history_train_acc, history_valid_acc)` → `learning curve.jpg` | ![Train/valid accuracy](learning%20curve.jpg) |
-| **Train loss** | `plot_learning_curve_loss(history_train_loss)` → `learning curve_loss.jpg` | ![Train loss](learning%20curve_loss.jpg) |
+| | |
+|:---:|:---:|
+| ![Train/valid accuracy](learning%20curve.jpg) | ![Train loss](learning%20curve_loss.jpg) |
 
 For headless environments (e.g. no Tk), set:
 
