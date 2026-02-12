@@ -154,7 +154,7 @@ class Trainer:
 
             X_train, y_train = (
                 self.transformation_engine.load_transformer_items(
-                    train_items, capacity=0.05))
+                    train_items, capacity=0.5))
             X_valid, y_valid = (
                 self.transformation_engine.load_transformer_items(
                     valid_items, capacity=1))

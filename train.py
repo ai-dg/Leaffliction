@@ -33,18 +33,18 @@ def main() -> None:
     parser = ArgsManager().build_train_parser()
     args = parser.parse_args()
     dataset_dir = Path(args.dataset_dir)
-    out_dir = Path(getattr(args, "out_dir", "artifacts"))
-    out_zip = Path(getattr(args, "out_zip", "learnings.zip"))
+    out_dir = Path(getattr(args, "out_dir", "training_artifacts"))
+    out_zip = Path(getattr(args, "out_zip", "train_output.zip"))
 
     cfg = TrainConfig(
-        epochs=args.epochs,
-        batch_size=args.batch_size,
-        lr=args.learning_rate,
-        valid_ratio=args.valid_ratio,
-        seed=args.seed,
-        img_size=(224, 224),
-        augment_train=True,
-        transform_train=True
+        epochs=getattr(args, "epochs", 70),
+        batch_size=getattr(args, "batch_size", 8),
+        lr=getattr(args, "learning_rate", getattr(args, "lr", 1e-3)),
+        valid_ratio=getattr(args, "valid_ratio", 0.2),
+        seed=getattr(args, "seed", 42),
+        img_size=(getattr(args, "img_h", 224), getattr(args, "img_w", 224)),
+        augment_train=getattr(args, "augment", True),
+        transform_train=getattr(args, "transform", True),
     )
 
     scanner = DatasetScanner()

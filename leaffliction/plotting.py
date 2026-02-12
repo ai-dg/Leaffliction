@@ -284,7 +284,6 @@ class Plotter:
 
         if save_to is not None:
             plt.savefig(save_to)
-
         plt.show()
         plt.close()
 

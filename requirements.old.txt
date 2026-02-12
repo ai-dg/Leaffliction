@@ -1,5 +1,9 @@
-pip install torch torchvision
-pip install plantcv
-pip install opencv-python
-pip install numpy
-pip install matplotlib
+# Ancien jeu de dépendances minimal (conservé pour référence)
+# Remplacé par requirements.txt aligné sur le projet (albumentationsx, rembg, etc.)
+
+torch
+torchvision
+plantcv
+opencv-python
+numpy
+matplotlib

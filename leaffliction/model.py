@@ -10,7 +10,6 @@ import shutil
 import random
 
 import numpy as np
-from sympy import true
 import torch
 import torch.nn as nn
 from leaffliction.utils import Logger
@@ -45,7 +44,7 @@ class LabelMapper:
     Maps between class names and numeric IDs for classification.
     """
 
-    def __init__(self, verbose: bool = true) -> None:
+    def __init__(self, verbose: bool = True) -> None:
         """
         Initialize the label mapper.
 
