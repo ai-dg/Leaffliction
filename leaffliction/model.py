@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 import json
 import zipfile
 import tempfile
@@ -14,7 +14,9 @@ import torch
 import torch.nn as nn
 from leaffliction.utils import Logger
 import sys
-from leaffliction.transformations import TransformationEngine
+
+if TYPE_CHECKING:
+    from leaffliction.transformations import TransformationEngine
 
 
 @dataclass
@@ -217,7 +219,7 @@ class InferenceManager:
         self,
         model: ConvolutionalNeuralNetwork,
         labels: LabelMapper,
-        transformation_engine: Optional[TransformationEngine],
+        transformation_engine: Optional["TransformationEngine"],
         cfg: ModelConfig,
         paths: Optional[ModelPaths] = None,
         verbose: bool = True

@@ -131,10 +131,10 @@ Open the notebook from the repo root so that relative paths (`worked/model`, `te
 
 ### ■ Binder Demo (Lightweight Environment)
 
-Binder is configured to use a **minimal, inference-only** environment so that the demo starts quickly and stays within resource limits. Configuration lives in the **`binder/`** folder at the repository root:
+Binder is configured to use a **minimal, inference-only** environment so that the image stays **around 1–2 GB** (instead of ~8 GB) and builds remain within resource limits. Configuration lives in the **`binder/`** folder at the repository root:
 
 - **`binder/runtime.txt`** — fixes the Python version (e.g. 3.11) for the Binder build.
-- **`binder/requirements.txt`** — installs only the dependencies needed to run **predict_demo.ipynb** on CPU (PyTorch, torchvision, numpy, pillow, matplotlib, opencv-python-headless, plus plantcv/rembg/onnxruntime for the transformation pipeline used in the notebook). No training stack (e.g. full dataset tooling, TensorFlow) is installed.
+- **`binder/requirements.txt`** — installs **CPU-only** PyTorch (via `--extra-index-url https://download.pytorch.org/whl/cpu`) and only the packages needed to run **predict_demo.ipynb**: torch, torchvision, numpy, pillow, matplotlib, opencv-python-headless. **PlantCV, rembg and onnxruntime are not installed** to keep the image small; the notebook detects their absence and uses a **simplified preprocessing fallback** (4× grayscale channel), so predictions on Binder may differ slightly from the full pipeline run locally with the full transformation engine.
 
 The rest of the project (local development, training, full CLI) continues to use the root-level environment (e.g. `requirements.txt` or `pyproject.toml`). The root **environment.yml**, if present, is not modified; Binder uses **only** the files under `binder/`.
 
