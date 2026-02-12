@@ -1,0 +1,12 @@
+# Minimal inference-only deps for predict_demo.ipynb on CPU.
+# Binder uses this file (see binder/); do not rely on repo root requirements.txt.
+torch
+torchvision
+numpy
+pillow
+matplotlib
+opencv-python-headless
+# Required by leaffliction.transformations (TransformationEngine) used in predict_demo
+plantcv
+rembg
+onnxruntime

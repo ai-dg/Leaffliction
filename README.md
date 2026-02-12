@@ -129,6 +129,15 @@ The **[predict_demo.ipynb](predict_demo.ipynb)** Jupyter notebook provides a rec
 
 Open the notebook from the repo root so that relative paths (`worked/model`, `test_images/`) resolve correctly. Dependencies are those in `requirements.txt` (including `prompt_toolkit>=3.0.48` for the Jupyter kernel; if the kernel fails with “missing module prompt_toolkit.cursor_shapes”, run `pip install 'prompt_toolkit>=3.0.48'`).
 
+### ■ Binder Demo (Lightweight Environment)
+
+Binder is configured to use a **minimal, inference-only** environment so that the demo starts quickly and stays within resource limits. Configuration lives in the **`binder/`** folder at the repository root:
+
+- **`binder/runtime.txt`** — fixes the Python version (e.g. 3.11) for the Binder build.
+- **`binder/requirements.txt`** — installs only the dependencies needed to run **predict_demo.ipynb** on CPU (PyTorch, torchvision, numpy, pillow, matplotlib, opencv-python-headless, plus plantcv/rembg/onnxruntime for the transformation pipeline used in the notebook). No training stack (e.g. full dataset tooling, TensorFlow) is installed.
+
+The rest of the project (local development, training, full CLI) continues to use the root-level environment (e.g. `requirements.txt` or `pyproject.toml`). The root **environment.yml**, if present, is not modified; Binder uses **only** the files under `binder/`.
+
 ---
 
 ## ▌ Usage
