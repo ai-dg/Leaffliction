@@ -4,7 +4,7 @@
 
 A PyTorch pipeline for multi-class classification of plant leaf diseases (e.g. Apple and Grape) using a custom CNN, image augmentations, and hand-crafted visual transformations (Hue, Masked, AnalyzeImage, PseudoLandmarks) as input channels.
 
-**Réalisateurs :** [ai-dg](https://github.com/ai-dg) · [s-t-e-v](https://github.com/s-t-e-v) ·
+**Réalisateurs :** [ai-dg](https://github.com/ai-dg) · [s-t-e-v](https://github.com/s-t-e-v)
 
 ---
 
