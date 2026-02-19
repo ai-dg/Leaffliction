@@ -1,9 +1,0 @@
-# Ancien jeu de dépendances minimal (conservé pour référence)
-# Remplacé par requirements.txt aligné sur le projet (albumentationsx, rembg, etc.)
-
-torch
-torchvision
-plantcv
-opencv-python
-numpy
-matplotlib
