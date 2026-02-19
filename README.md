@@ -7,7 +7,7 @@
 
 A PyTorch pipeline for multi-class classification of plant leaf diseases (e.g. Apple and Grape) using a custom CNN, image augmentations, and hand-crafted visual transformations (Hue, Masked, AnalyzeImage, PseudoLandmarks) as input channels.
 
-**Réalisateurs :** [ai-dg](https://github.com/ai-dg) · [s-t-e-v](https://github.com/s-t-e-v)
+**Authors:** [ai-dg](https://github.com/ai-dg) · [s-t-e-v](https://github.com/s-t-e-v)
 
 ---
 
@@ -31,28 +31,28 @@ A PyTorch pipeline for multi-class classification of plant leaf diseases (e.g. A
 
 ## ▌ Project Overview
 
-Leaffliction implements an end-to-end ML workflow for leaf-disease recognition:
+Complete workflow (data → training → prediction) for leaf disease recognition:
 
-1. **Dataset** — Directory-based layout (one folder per class).
-2. **Distribution** — Analyse and visualise class counts (pie/bar).
-3. **Augmentation** — Balance classes via Albumentations (rotation, blur, contrast, scaling, illumination, perspective).
-4. **Transformation** — Build multi-channel inputs from plant-specific transforms (Hue, Masked, AnalyzeImage, PseudoLandmarks) for the CNN.
-5. **Training** — Stratified train/validation split, optional train-data cap via a **capacity** parameter, Adam optimizer, CrossEntropyLoss.
-6. **Prediction** — Single image or directory, using a saved model (directory or ZIP bundle) and SHA1 signature.
+1. **Data** — Images organized by class in subdirectories.
+2. **Distribution** — Analysis and visualization of class counts (pie chart / bars).
+3. **Augmentation** — Class balancing via Albumentations (rotation, blur, contrast, scaling, illumination, perspective).
+4. **Transformation** — Construction of 4 channels (Hue, Masked, AnalyzeImage, PseudoLandmarks) used as CNN input.
+5. **Training** — Stratified train/validation split, optional subsampling (capacity), Adam, CrossEntropyLoss.
+6. **Prediction** — Single image or directory; model loaded from a directory or ZIP archive (SHA1 signature).
 
-The model is a **Convolutional Neural Network** (Conv2d blocks + GAP + classifier). Training is relatively heavy due to the CNN and the number of transformed samples.
+Le modèle est un **CNN** (blocs Conv2d + GAP + classifieur). L’entraînement est coûteux (volume de données transformées et taille du réseau).
 
 ---
 
 ## ▌ Features
 
-✔️ **Custom CNN** — PyTorch `ConvolutionalNeuralNetwork` with configurable input channels and number of classes.\
-✔️ **Stratified split** — Train/validation split with optional class balance.\
-✔️ **Augmentation** — Albumentations-based augmentation and class balancing.\
-✔️ **Transform pipeline** — Hue, Masked, AnalyzeImage, PseudoLandmarks (and optional Grayscale, Gaussian, ROI, Pseudo) for visual feature channels.\
-✔️ **Training metrics** — Train/validation accuracy per epoch; final evaluation with best checkpoint.\
-✔️ **Model export** — Saved as `model.pth` + `config.json` + `labels.json`, then packaged into a ZIP with SHA1 in `signature.txt`.\
-✔️ **CLI** — Entry points: `Distribution.py`, `Augmentation.py`, `Transformation.py`, `train.py`, `predict.py`.
+✔️ **CNN dédié** — `ConvolutionalNeuralNetwork` PyTorch (canaux d’entrée et nombre de classes configurables).  
+✔️ **Stratified split** — Train/validation with optional class balancing.  
+✔️ **Augmentation** — Albumentations to balance and augment data.  
+✔️ **Pipeline de transforms** — Quatre canaux (Hue, Masked, AnalyzeImage, PseudoLandmarks) pour l’entrée du modèle ; autres options (Grayscale, Gaussian, ROI) disponibles.  
+✔️ **Métriques d’entraînement** — Accuracy et loss par epoch ; sauvegarde du meilleur checkpoint.  
+✔️ **Model export** — `model.pth`, `config.json`, `labels.json`, ZIP and SHA1 signature (`signature.txt`).  
+✔️ **CLI** — Scripts: `Distribution.py`, `Augmentation.py`, `Transformation.py`, `train.py`, `predict.py`.
 
 ---
 
@@ -92,7 +92,7 @@ Images must be grouped by class in subdirectories:
 ### ■ Quick commands
 
 ```bash
-# Distribution (analyse classes)
+# Distribution (class analysis)
 python Distribution.py ./leaves/images --mode both --save . --verbose
 
 # Augmentation (single image demo)
@@ -120,11 +120,10 @@ python predict.py --model-path ./worked/model ./test_images/Unit_test1/Apple_Bla
 
 ### ■ Demo Notebook
 
-The **[predict_demo.ipynb](predict_demo.ipynb)** Jupyter notebook provides a recruiter-friendly, data-scientist-style demo of the **prediction pipeline only** (no training). It runs on CPU. Use the **Open in Colab** badge above to run it in Google Colab (the notebook will clone the repo if needed).
+The **[predict_demo.ipynb](predict_demo.ipynb)** notebook presents the **inference pipeline** (without training): model, preprocessing, prediction. Use the **Open in Colab** badge to run it online (clone the repository if needed).
 
-**What it demonstrates:**
-
-- Loading the trained model from `worked/model/` (with a clear message if the model is missing).
+**Content:**
+- Loading the model (`worked/model/`) and a test image.
 - Loading an image from a local sample folder (`test_images/Unit_test1`, `Unit_test2`, or `test_images/100/<class>/`) or using a custom path.
 - Preprocessing with the project’s **TransformationEngine** (Hue, Masked, AnalyzeImage, PseudoLandmarks) and visualising the original image and transformed channels.
 - Running inference and displaying the **predicted class**, **confidence**, and **top-k** class probabilities.
