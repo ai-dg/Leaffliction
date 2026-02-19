@@ -1,4 +1,7 @@
 # Leaffliction
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ai-dg/Leaffliction/blob/main/predict_demo.ipynb)
+
 ![Score](https://img.shields.io/badge/Score-125%25-brightgreen)  
 **Image classification by disease recognition on leaves**
 
@@ -117,7 +120,7 @@ python predict.py --model-path ./worked/model ./test_images/Unit_test1/Apple_Bla
 
 ### ■ Demo Notebook
 
-The **[predict_demo.ipynb](predict_demo.ipynb)** Jupyter notebook provides a recruiter-friendly, data-scientist-style demo of the **prediction pipeline only** (no training). It runs on CPU and is suitable for Binder-like environments.
+The **[predict_demo.ipynb](predict_demo.ipynb)** Jupyter notebook provides a recruiter-friendly, data-scientist-style demo of the **prediction pipeline only** (no training). It runs on CPU. Use the **Open in Colab** badge above to run it in Google Colab (the notebook will clone the repo if needed).
 
 **What it demonstrates:**
 
@@ -128,15 +131,6 @@ The **[predict_demo.ipynb](predict_demo.ipynb)** Jupyter notebook provides a rec
 - Short explanations of the problem, data assumptions, model architecture, and how metrics are produced in the project (train/valid accuracy, directory accuracy), plus limitations and next steps.
 
 Open the notebook from the repo root so that relative paths (`worked/model`, `test_images/`) resolve correctly. Dependencies are those in `requirements.txt` (including `prompt_toolkit>=3.0.48` for the Jupyter kernel; if the kernel fails with “missing module prompt_toolkit.cursor_shapes”, run `pip install 'prompt_toolkit>=3.0.48'`).
-
-### ■ Binder Demo (Lightweight Environment)
-
-Binder is configured to use a **minimal, inference-only** environment so that the image stays **around 1–2 GB** (instead of ~8 GB) and builds remain within resource limits. Configuration lives in the **`binder/`** folder at the repository root:
-
-- **`binder/runtime.txt`** — fixes the Python version (e.g. 3.11) for the Binder build.
-- **`binder/requirements.txt`** — installs **CPU-only** PyTorch (via `--extra-index-url https://download.pytorch.org/whl/cpu`) and only the packages needed to run **predict_demo.ipynb**: torch, torchvision, numpy, pillow, matplotlib, opencv-python-headless. **PlantCV, rembg and onnxruntime are not installed** to keep the image small; the notebook detects their absence and uses a **simplified preprocessing fallback** (4× grayscale channel), so predictions on Binder may differ slightly from the full pipeline run locally with the full transformation engine.
-
-The rest of the project (local development, training, full CLI) continues to use the root-level environment (e.g. `requirements.txt` or `pyproject.toml`). The root **environment.yml**, if present, is not modified; Binder uses **only** the files under `binder/`.
 
 ---
 
