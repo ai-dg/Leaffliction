@@ -1,6 +1,8 @@
 # Leaffliction
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ai-dg/Leaffliction/blob/main/predict_demo.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ai-dg/Leaffliction/blob/main/predict_demo.ipynb) [![Open in Hugging Face Spaces](https://huggingface.co/datasets/huggingface/badges/resolve/main/open-in-hf-spaces-md.svg)](https://huggingface.co/spaces/djidane303/leaffliction) [![View Notebook on GitHub](https://img.shields.io/badge/View%20Notebook-GitHub-black?logo=github)](https://github.com/ai-dg/Leaffliction/blob/main/predict_demo.ipynb)
+
+
 
 ![Score](https://img.shields.io/badge/Score-125%25-brightgreen)  
 **Image classification by disease recognition on leaves**
